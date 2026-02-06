@@ -1,0 +1,30 @@
+{
+  "name": "flare-hardhat-starter",
+  "version": "1.0.0",
+  "description": "Hardhat starter project for Flare Network",
+  "main": "index.js",
+  "scripts": {
+    "compile": "hardhat compile",
+    "test": "hardhat test",
+    "deploy:flare": "hardhat run scripts/deploy.js --network flare",
+    "deploy:coston": "hardhat run scripts/deploy.js --network coston",
+    "deploy:coston2": "hardhat run scripts/deploy.js --network coston2",
+    "node": "hardhat node"
+  },
+  "keywords": [
+    "hardhat",
+    "flare",
+    "blockchain",
+    "ethereum"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox": "^4.0.0",
+    "hardhat": "^2.19.0"
+  },
+  "dependencies": {
+    "dotenv": "^16.3.1"
+  }
+}
+
