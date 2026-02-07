@@ -27,14 +27,24 @@ contract PayoutEngine {
     // --- errors ---
     error InvalidProof();
 
+    function setMerkleRoot(bytes32 _root) external {
+        merkleRoot = _root;
+    }
+
+
     function verifyClaim(
         address user,
         uint256 amount,
         bytes32[] calldata proof
-    ) public view returns (bytes32) {
+    ) public returns (bytes32) {
         bytes32 leaf = keccak256(
             abi.encodePacked(user, amount)
         );
+
+        if (claimed[leaf]) {
+            revert("Already claimed");
+        }
+
 
         bool valid = MerkleProof.verify(
             proof,
@@ -46,6 +56,8 @@ contract PayoutEngine {
             revert InvalidProof();
         }
 
+        claimed[leaf] = true; // no longer a view function since that view means it can't update state. 
+        
         return leaf;
     }
 }
