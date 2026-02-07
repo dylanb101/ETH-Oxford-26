@@ -1,9 +1,33 @@
 import React, { useState, useMemo } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, useLocation, useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import { fetchFlightData, parseFlightData } from './services/aviationStackService';
 import './App.css';
 
 const DELAY_THRESHOLD_MINUTES = 120; // Contract condition: payout if delay >= 2hrs
+
+// Static Golden Gate Bridge background image for all pages
+const BACKGROUND_IMAGE = 'https://images.unsplash.com/photo-1501594907352-04cda38ebc29?ixlib=rb-4.0.3&auto=format&fit=crop&w=2000&q=80';
+
+// Airport code to country flag mapping
+function getCountryFlag(airportCode) {
+  const airportToCountry = {
+    // UK airports
+    'LHR': 'GB', 'LGW': 'GB', 'STN': 'GB', 'LTN': 'GB', 'EDI': 'GB', 'MAN': 'GB', 'BHX': 'GB',
+    // US airports
+    'JFK': 'US', 'LAX': 'US', 'ORD': 'US', 'DFW': 'US', 'DEN': 'US', 'SFO': 'US', 'SEA': 'US', 'MIA': 'US', 'ATL': 'US',
+    // European airports
+    'CDG': 'FR', 'ORY': 'FR', 'AMS': 'NL', 'FRA': 'DE', 'MUC': 'DE', 'FCO': 'IT', 'MAD': 'ES', 'BCN': 'ES',
+    'ZUR': 'CH', 'VIE': 'AT', 'BRU': 'BE', 'DUB': 'IE', 'CPH': 'DK', 'ARN': 'SE', 'OSL': 'NO',
+    // Asian airports
+    'DXB': 'AE', 'DOH': 'QA', 'SIN': 'SG', 'HKG': 'HK', 'NRT': 'JP', 'ICN': 'KR', 'PEK': 'CN', 'PVG': 'CN',
+    // Other
+    'SYD': 'AU', 'MEL': 'AU', 'YYZ': 'CA', 'YVR': 'CA',
+  };
+  
+  const code = airportCode?.toUpperCase().slice(0, 3);
+  const countryCode = airportToCountry[code] || 'GB'; // Default to GB
+  return `https://flagcdn.com/w20/${countryCode.toLowerCase()}.png`;
+}
 
 function isDateInPast(dateStr) {
   if (!dateStr) return false;
@@ -22,142 +46,7 @@ const INITIAL_CLAIMS = [
 
 // Shared state context (simplified - in production use Context API or state management)
 let sharedClaims = INITIAL_CLAIMS;
-let sharedFlightData = null; // AviationStack API response
-
-// AviationStack API function - returns all flights for a flight number and date
-async function fetchFlightData(flightNumber, flightDate) {
-  // Validate flight number format (e.g., "BA297", "AA100")
-  const cleanFlightNumber = flightNumber.toUpperCase().trim();
-  const match = cleanFlightNumber.match(/^([A-Z]{2})(\d+)$/);
-  if (!match) {
-    throw new Error('Invalid flight number format. Use format like BA297 or AA100');
-  }
-  
-  // Format date as YYYY-MM-DD for API
-  const formattedDate = flightDate ? new Date(flightDate).toISOString().split('T')[0] : null;
-  
-  // Note: In production, use environment variable for API key
-  // For now, using a placeholder - user will need to add their API key
-  // Also note: AviationStack API may require CORS proxy in production
-  const API_KEY = process.env.REACT_APP_AVIATIONSTACK_API_KEY || 'YOUR_API_KEY_HERE';
-  const API_URL = `https://api.aviationstack.com/v1/flights`;
-  
-  try {
-    const params = {
-      access_key: API_KEY,
-      flight_iata: cleanFlightNumber,
-    };
-    
-    // Add flight_date parameter if provided
-    if (formattedDate) {
-      params.flight_date = formattedDate;
-    }
-    
-    const response = await axios.get(API_URL, { params });
-    
-    if (response.data && response.data.data && response.data.data.length > 0) {
-      return response.data.data; // Return all matching flights
-    }
-    throw new Error('Flight not found');
-  } catch (error) {
-    console.error('AviationStack API error:', error);
-    
-    // If API key is missing or API fails, return mock data for development/testing
-    if (API_KEY === 'YOUR_API_KEY_HERE' || error.response?.status === 401) {
-      console.warn('Using mock flight data. Please set REACT_APP_AVIATIONSTACK_API_KEY environment variable for production.');
-    }
-    
-    const [, airlineCode, flightNum] = match;
-    const baseDate = formattedDate ? new Date(formattedDate) : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
-    
-    // Return mock data - simulate multiple flights if date is provided
-    if (formattedDate) {
-      const date1 = new Date(baseDate);
-      date1.setHours(8, 0, 0, 0);
-      const arr1 = new Date(date1);
-      arr1.setHours(16, 0, 0, 0);
-      
-      const date2 = new Date(baseDate);
-      date2.setHours(14, 30, 0, 0);
-      const arr2 = new Date(date2);
-      arr2.setHours(22, 45, 0, 0);
-      
-      return [
-        {
-          flight: {
-            iata: cleanFlightNumber,
-            number: flightNum,
-          },
-          airline: {
-            name: airlineCode === 'BA' ? 'British Airways' : airlineCode === 'AA' ? 'American Airlines' : airlineCode === 'LH' ? 'Lufthansa' : 'Airline',
-            iata: airlineCode,
-          },
-          departure: {
-            airport: 'London Heathrow',
-            iata: 'LHR',
-            scheduled: date1.toISOString(),
-          },
-          arrival: {
-            airport: 'New York JFK',
-            iata: 'JFK',
-            scheduled: arr1.toISOString(),
-          },
-          aircraft: {
-            name: 'Boeing 777',
-          },
-        },
-        {
-          flight: {
-            iata: cleanFlightNumber,
-            number: flightNum,
-          },
-          airline: {
-            name: airlineCode === 'BA' ? 'British Airways' : airlineCode === 'AA' ? 'American Airlines' : airlineCode === 'LH' ? 'Lufthansa' : 'Airline',
-            iata: airlineCode,
-          },
-          departure: {
-            airport: 'London Heathrow',
-            iata: 'LHR',
-            scheduled: date2.toISOString(),
-          },
-          arrival: {
-            airport: 'New York JFK',
-            iata: 'JFK',
-            scheduled: arr2.toISOString(),
-          },
-          aircraft: {
-            name: 'Boeing 777',
-          },
-        },
-      ];
-    }
-    
-    // Single flight if no date provided
-    return [{
-      flight: {
-        iata: cleanFlightNumber,
-        number: flightNum,
-      },
-      airline: {
-        name: airlineCode === 'BA' ? 'British Airways' : airlineCode === 'AA' ? 'American Airlines' : airlineCode === 'LH' ? 'Lufthansa' : 'Airline',
-        iata: airlineCode,
-      },
-      departure: {
-        airport: 'London Heathrow',
-        iata: 'LHR',
-        scheduled: baseDate.toISOString(),
-      },
-      arrival: {
-        airport: 'New York JFK',
-        iata: 'JFK',
-        scheduled: new Date(baseDate.getTime() + 8 * 60 * 60 * 1000).toISOString(),
-      },
-      aircraft: {
-        name: 'Boeing 777',
-      },
-    }];
-  }
-}
+let sharedFlightData = null; // Parsed flight data from API
 
 function TopBar() {
   const location = useLocation();
@@ -236,23 +125,27 @@ function HomePage() {
     setError(null);
     
     try {
-      const flights = await fetchFlightData(flightNumber, flightDate);
+      // Fetch raw flight data from API
+      const rawFlights = await fetchFlightData(flightNumber, flightDate);
       
-      if (flights.length === 0) {
+      // Parse flight data into structured format
+      const parsedFlights = parseFlightData(rawFlights);
+      
+      if (parsedFlights.length === 0) {
         setError('No flights found for this flight number and date');
         setIsLoading(false);
         return;
       }
       
       // If only one flight, proceed directly to insure page
-      if (flights.length === 1) {
-        sharedFlightData = flights[0];
-        navigate('/insure', { state: { flightData: flights[0], flightNumber } });
+      if (parsedFlights.length === 1) {
+        sharedFlightData = parsedFlights[0];
+        navigate('/insure', { state: { flightData: parsedFlights[0], flightNumber } });
         return;
       }
       
       // If multiple flights, show time selection
-      setAvailableFlights(flights);
+      setAvailableFlights(parsedFlights);
       setShowTimeSelection(true);
       setIsLoading(false);
     } catch (err) {
@@ -272,14 +165,6 @@ function HomePage() {
     return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
   };
 
-  const formatFlightDisplay = (flight) => {
-    const dep = flight.departure || {};
-    const arr = flight.arrival || {};
-    const depTime = formatFlightTime(dep.scheduled);
-    const arrTime = formatFlightTime(arr.scheduled);
-    return `${depTime} → ${arrTime} (${dep.airport || dep.iata} → ${arr.airport || arr.iata})`;
-  };
-
   const isHomeStart = true;
 
   return (
@@ -288,7 +173,13 @@ function HomePage() {
       <main id="main-content" className={`main ${isHomeStart ? 'main--home' : ''}`} role="main">
         <div className="page page--home-start">
           <section className="hero" aria-label="Start your claim">
-            <div className="hero-bg" aria-hidden="true" />
+            <div 
+              className="hero-bg" 
+              aria-hidden="true"
+              style={{
+                backgroundImage: `url(${BACKGROUND_IMAGE})`
+              }}
+            />
             <div className="hero-inner">
               <div className="hero-content-grid">
                 {/* Single horizontal form box - flight number and date */}
@@ -351,8 +242,12 @@ function HomePage() {
                               className="time-selection-option"
                               onClick={() => handleTimeSelection(flight)}
                             >
-                              <span className="time-selection-time">{formatFlightTime(flight.departure?.scheduled)}</span>
-                              <span className="time-selection-details">{formatFlightDisplay(flight)}</span>
+                              <span className="time-selection-content">
+                                <span className="time-selection-time">{formatFlightTime(flight.departureTime)}</span>
+                                <span className="time-selection-arrow"> → </span>
+                                <span className="time-selection-time">{formatFlightTime(flight.arrivalTime)}</span>
+                                <span className="time-selection-route"> ({flight.from} → {flight.to})</span>
+                              </span>
                             </button>
                           ))}
                         </div>
@@ -377,7 +272,6 @@ function HomePage() {
                 {/* Slogan text - right side */}
                 <div className="hero-copy hero-copy--right">
                   <p className="hero-headline">Delay insurance on your journey.</p>
-                  <p className="hero-sub">Premium from delay probability. Smart contract pays out if the condition is met. Verified by Flare (FDC).</p>
                 </div>
               </div>
             </div>
@@ -394,29 +288,23 @@ function InsurePage() {
   const flightDataFromRoute = location.state?.flightData || sharedFlightData;
   const flightNumberFromRoute = location.state?.flightNumber || '';
   
-  // Extract flight details from API response
+  // Extract flight details from parsed flight data
   const getFlightDetails = (data) => {
     if (!data) return {};
-    const dep = data.departure || {};
-    const arr = data.arrival || {};
-    const airline = data.airline || {};
-    const flight = data.flight || {};
-    const aircraft = data.aircraft || {};
     
-    // Parse date from scheduled time (format: "2026-02-15T14:30:00+00:00")
-    const depDate = dep.scheduled ? new Date(dep.scheduled).toISOString().slice(0, 10) : '';
-    const depTime = dep.scheduled ? new Date(dep.scheduled).toTimeString().slice(0, 5) : '';
-    const arrTime = arr.scheduled ? new Date(arr.scheduled).toTimeString().slice(0, 5) : '';
+    // Parse times from ISO strings
+    const depTime = data.departureTime ? new Date(data.departureTime).toTimeString().slice(0, 5) : '';
+    const arrTime = data.arrivalTime ? new Date(data.arrivalTime).toTimeString().slice(0, 5) : '';
     
     return {
-      from: dep.airport || dep.iata || '',
-      to: arr.airport || arr.iata || '',
-      date: depDate,
+      from: data.from || '',
+      to: data.to || '',
+      date: data.date || '',
       depTime,
       arrTime,
-      airline: airline.name || airline.iata || '',
-      aircraft: aircraft.name || '',
-      flightNumber: flight.iata || flightNumberFromRoute || '',
+      airline: data.airline || '',
+      aircraft: data.aircraft || '',
+      flightNumber: data.flightNumber || flightNumberFromRoute || '',
     };
   };
 
@@ -439,6 +327,7 @@ function InsurePage() {
   const [showInfoBars, setShowInfoBars] = useState(false);
   const [submittedTicketRef, setSubmittedTicketRef] = useState(''); // Store ticketRef for final submission
   const [fieldErrors, setFieldErrors] = useState({}); // Track field validation errors
+  const [hasAttemptedSubmit, setHasAttemptedSubmit] = useState(false); // Track if form submission was attempted
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -452,6 +341,29 @@ function InsurePage() {
         return newErrors;
       });
     }
+  };
+
+  // Get airport code from airport name (e.g., "London Heathrow" -> "LHR")
+  const getAirportCode = (airportName) => {
+    if (!airportName) return '';
+    // Try to extract IATA code if available, otherwise use airport name
+    const codes = {
+      'London Heathrow': 'LHR', 'Heathrow': 'LHR',
+      'New York JFK': 'JFK', 'JFK': 'JFK',
+      'Los Angeles': 'LAX', 'LAX': 'LAX',
+      'Chicago O\'Hare': 'ORD', 'O\'Hare': 'ORD',
+      'Paris Charles de Gaulle': 'CDG', 'CDG': 'CDG',
+      'Amsterdam': 'AMS', 'AMS': 'AMS',
+      'Frankfurt': 'FRA', 'FRA': 'FRA',
+    };
+    for (const [key, code] of Object.entries(codes)) {
+      if (airportName.includes(key) || airportName === code) {
+        return code;
+      }
+    }
+    // Extract first 3 letters if it looks like a code
+    const match = airportName.match(/^([A-Z]{3})/);
+    return match ? match[1] : airportName.slice(0, 3).toUpperCase();
   };
 
   const minDate = new Date().toISOString().slice(0, 10);
@@ -485,6 +397,9 @@ function InsurePage() {
   // First submit: show info bars and clear passenger details
   const handleShowInfoBars = (e) => {
     e.preventDefault();
+    
+    // Mark that submission was attempted
+    setHasAttemptedSubmit(true);
     
     // Validate form
     const errors = validateForm();
@@ -569,7 +484,18 @@ function InsurePage() {
   const contractConditions = `Payout if delay ≥ ${DELAY_THRESHOLD_MINUTES} minutes. Verified by Flare Data Connector (FDC). Contract created before travel — no contracts after the event date.`;
 
   return (
-    <div className="page page--insure">
+    <div 
+      className="page page--insure"
+      style={{
+        backgroundImage: `url(${BACKGROUND_IMAGE})`,
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat',
+        backgroundAttachment: 'fixed',
+        minHeight: '100vh'
+      }}
+    >
+      <div className="insure-page-background-overlay" />
       <div className="insure-page">
         <div className="insure-inner">
           <button type="button" className="claim-details-back" onClick={() => navigate('/')}>
@@ -598,52 +524,75 @@ function InsurePage() {
                     />
                   </label>
                   
-                  <label>
+                  <label className="input-with-flag">
                     From
-                    <input
-                      type="text"
-                      name="from"
-                      value={form.from}
-                      onChange={handleChange}
-                      placeholder="Departure airport"
-                      required
-                      className={fieldErrors.from ? 'input-error' : ''}
-                    />
-                    {fieldErrors.from && (
-                      <span className="field-error-message" role="alert">{fieldErrors.from}</span>
-                    )}
+                    <div className="input-wrapper">
+                      <input
+                        type="text"
+                        name="from"
+                        value={form.from}
+                        onChange={handleChange}
+                        placeholder="Departure airport"
+                        required
+                        readOnly={!!flightDataFromRoute}
+                        className={`${flightDataFromRoute ? 'readonly-field' : ''}`}
+                      />
+                      {form.from && (
+                        <img 
+                          src={getCountryFlag(getAirportCode(form.from))} 
+                          alt="Country flag" 
+                          className="country-flag"
+                        />
+                      )}
+                      {!form.from && hasAttemptedSubmit && (
+                        <div className="input-red-overlay" />
+                      )}
+                    </div>
                   </label>
                   
-                  <label>
+                  <label className="input-with-flag">
                     To
-                    <input
-                      type="text"
-                      name="to"
-                      value={form.to}
-                      onChange={handleChange}
-                      placeholder="Arrival airport"
-                      required
-                      className={fieldErrors.to ? 'input-error' : ''}
-                    />
-                    {fieldErrors.to && (
-                      <span className="field-error-message" role="alert">{fieldErrors.to}</span>
-                    )}
+                    <div className="input-wrapper">
+                      <input
+                        type="text"
+                        name="to"
+                        value={form.to}
+                        onChange={handleChange}
+                        placeholder="Arrival airport"
+                        required
+                        readOnly={!!flightDataFromRoute}
+                        className={`${flightDataFromRoute ? 'readonly-field' : ''}`}
+                      />
+                      {form.to && (
+                        <img 
+                          src={getCountryFlag(getAirportCode(form.to))} 
+                          alt="Country flag" 
+                          className="country-flag"
+                        />
+                      )}
+                      {!form.to && hasAttemptedSubmit && (
+                        <div className="input-red-overlay" />
+                      )}
+                    </div>
                   </label>
                   
                   <label>
                     Date
-                    <input
-                      type="date"
-                      name="date"
-                      value={form.date}
-                      onChange={handleChange}
-                      min={minDate}
-                      required
-                      className={fieldErrors.date ? 'input-error' : ''}
-                    />
-                    {fieldErrors.date && (
-                      <span className="field-error-message" role="alert">{fieldErrors.date}</span>
-                    )}
+                    <div className="input-wrapper">
+                      <input
+                        type="date"
+                        name="date"
+                        value={form.date}
+                        onChange={handleChange}
+                        min={minDate}
+                        required
+                        readOnly={!!flightDataFromRoute}
+                        className={flightDataFromRoute ? 'readonly-field' : ''}
+                      />
+                      {!form.date && hasAttemptedSubmit && (
+                        <div className="input-red-overlay" />
+                      )}
+                    </div>
                   </label>
                   
                   <label>
@@ -654,6 +603,8 @@ function InsurePage() {
                       value={form.depTime}
                       onChange={handleChange}
                       placeholder="HH:MM"
+                      readOnly={!!flightDataFromRoute}
+                      className={flightDataFromRoute ? 'readonly-field' : ''}
                     />
                   </label>
                   
@@ -665,6 +616,8 @@ function InsurePage() {
                       value={form.arrTime}
                       onChange={handleChange}
                       placeholder="HH:MM"
+                      readOnly={!!flightDataFromRoute}
+                      className={flightDataFromRoute ? 'readonly-field' : ''}
                     />
                   </label>
                   
@@ -676,6 +629,8 @@ function InsurePage() {
                       value={form.airline}
                       onChange={handleChange}
                       placeholder="Airline name"
+                      readOnly={!!flightDataFromRoute}
+                      className={flightDataFromRoute ? 'readonly-field' : ''}
                     />
                   </label>
                   
@@ -687,6 +642,8 @@ function InsurePage() {
                       value={form.aircraft}
                       onChange={handleChange}
                       placeholder="Aircraft type"
+                      readOnly={!!flightDataFromRoute}
+                      className={flightDataFromRoute ? 'readonly-field' : ''}
                     />
                   </label>
                 </div>
@@ -697,18 +654,19 @@ function InsurePage() {
                 
                 <label>
                   Ticket Code / Booking Reference
-                  <input
-                    type="text"
-                    name="ticketRef"
-                    value={form.ticketRef}
-                    onChange={handleChange}
-                    placeholder="e.g., ABC123XYZ"
-                    required
-                    className={fieldErrors.ticketRef ? 'input-error' : ''}
-                  />
-                  {fieldErrors.ticketRef && (
-                    <span className="field-error-message" role="alert">{fieldErrors.ticketRef}</span>
-                  )}
+                  <div className="input-wrapper">
+                    <input
+                      type="text"
+                      name="ticketRef"
+                      value={form.ticketRef}
+                      onChange={handleChange}
+                      placeholder="e.g., ABC123XYZ"
+                      required
+                    />
+                    {!form.ticketRef && hasAttemptedSubmit && (
+                      <div className="input-red-overlay" />
+                    )}
+                  </div>
                 </label>
                 
                 <div className="upload-zone" aria-label="Optional ticket upload">
