@@ -56,20 +56,23 @@
   --font-body: "Source Serif 4", Georgia, serif;
   --font-mono: "JetBrains Mono", monospace;
 
-  /* Container */
+  /* Container — spacious, not touching */
   --container-max: 72rem;
   --container-padding: 1.5rem;
+  --section-gap: 4rem;
 }
 
 @media (min-width: 768px) {
   :root {
-    --container-padding: 2rem;
+    --container-padding: 2.5rem;
+    --section-gap: 5rem;
   }
 }
 
 @media (min-width: 1024px) {
   :root {
-    --container-padding: 3rem;
+    --container-padding: 4rem;
+    --section-gap: 6rem;
   }
 }
 

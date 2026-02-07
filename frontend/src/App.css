@@ -30,7 +30,7 @@
   align-items: center;
   justify-content: space-between;
   width: 100%;
-  padding: var(--space-16) var(--container-padding);
+  padding: var(--space-24) var(--container-padding);
   border-bottom: var(--border-thin);
   background: var(--background);
 }
@@ -40,10 +40,12 @@
   font-size: var(--text-lg);
   font-weight: 600;
   letter-spacing: -0.02em;
-  padding: var(--space-8) var(--space-16);
+  padding: var(--space-12) var(--space-24);
   border: var(--border-thin);
   color: var(--foreground);
   border-radius: var(--radius);
+  text-decoration: none;
+  display: inline-block;
 }
 
 .topbar-nav {
@@ -64,6 +66,8 @@
   min-height: 44px;
   transition: background 100ms, color 100ms;
   border-radius: var(--radius);
+  text-decoration: none;
+  display: inline-block;
 }
 
 .topbar-btn:hover {
@@ -100,6 +104,50 @@
 }
 
 /* --------------------------------------------------------------------------
+   Separate pages — consistent page wrapper and title
+   -------------------------------------------------------------------------- */
+
+.page {
+  width: 100%;
+  min-height: 100%;
+}
+
+.page-title {
+  font-family: var(--font-display);
+  font-size: var(--text-3xl);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  margin-bottom: var(--space-48);
+  color: var(--foreground);
+}
+
+@media (min-width: 768px) {
+  .page-title {
+    font-size: var(--text-4xl);
+    margin-bottom: var(--space-64);
+  }
+}
+
+.page-title--hero {
+  color: var(--accentForeground);
+  text-align: center;
+  margin-bottom: var(--space-48);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+  grid-column: 1 / -1;
+}
+
+@media (min-width: 900px) {
+  .page-title--hero {
+    text-align: left;
+    margin-bottom: var(--space-48);
+  }
+}
+
+.page--home-start .hero-inner {
+  align-items: center;
+}
+
+/* --------------------------------------------------------------------------
    Hero — full-bleed transport image, left-side claim form (Trainline-style)
    -------------------------------------------------------------------------- */
 
@@ -108,21 +156,25 @@
   min-height: 85vh;
   display: flex;
   align-items: center;
-  padding: var(--space-48) var(--container-padding);
+  padding: var(--space-48) 0;
   overflow: hidden;
 }
 
 .app--home .hero {
   min-height: 0;
   height: 100%;
-  padding: var(--space-24) var(--container-padding);
+  padding: var(--space-48) 0;
   display: flex;
   align-items: center;
 }
 
+/* Full-bleed: image spans entire viewport width, no white borders */
 .hero-bg {
   position: absolute;
   inset: 0;
+  left: 0;
+  right: 0;
+  width: 100%;
   background: var(--muted) url("https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?ixlib=rb-4.0.3&auto=format&fit=crop&w=1600&q=80") center / cover no-repeat;
 }
 
@@ -140,28 +192,65 @@
   width: 100%;
   max-width: var(--container-max);
   margin: 0 auto;
+  padding: 0 var(--container-padding);
   display: grid;
   grid-template-columns: 1fr;
-  gap: var(--space-48);
+  gap: var(--space-64);
   align-items: center;
 }
 
 @media (min-width: 900px) {
   .hero-inner {
     grid-template-columns: minmax(280px, 380px) 1fr;
-    gap: var(--space-48);
+    gap: var(--space-64);
   }
 }
 
 .app--home .hero-inner {
-  gap: var(--space-32);
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  max-width: var(--container-max);
+  margin: 0 auto;
+  padding: calc(var(--space-64) + 60px) var(--container-padding) var(--space-48);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.hero-content-grid {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-48);
+  align-items: center;
+  width: 100%;
 }
 
 @media (min-width: 900px) {
   .app--home .hero-inner {
-    grid-template-columns: minmax(420px, 520px) 1fr;
-    gap: var(--space-48);
-    align-items: center;
+    padding-top: calc(var(--space-64) + 80px);
+  }
+  
+  .hero-content-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-64);
+    align-items: start;
+    max-width: 100%;
+  }
+}
+
+.hero-form-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-24);
+  align-items: center;
+  width: 100%;
+}
+
+@media (min-width: 900px) {
+  .hero-form-wrapper {
+    align-items: flex-start;
   }
 }
 
@@ -172,13 +261,15 @@
   border-radius: var(--radius);
 }
 
-.app--home .hero-form-card {
-  padding: var(--space-24) var(--space-32);
+/* Trainline-like hero form: spacious, button not touching sides */
+.hero-form-card--trainline {
+  padding: var(--space-32) var(--space-32);
+  border: var(--border-thin);
 }
 
 @media (min-width: 640px) {
-  .app--home .hero-form-card {
-    padding: var(--space-32) var(--space-48);
+  .hero-form-card--trainline {
+    padding: var(--space-48) var(--space-48);
   }
 }
 
@@ -191,64 +282,629 @@
   color: var(--foreground);
 }
 
-.app--home .hero-form-title {
-  font-size: var(--text-2xl);
-  margin-bottom: var(--space-8);
-}
-
-.hero-form-hint {
-  font-size: var(--text-sm);
-  color: var(--mutedForeground);
-  margin-bottom: var(--space-24);
-}
-
-.app--home .hero-form-hint {
-  margin-bottom: var(--space-20);
-  font-size: var(--text-sm);
-}
-
-/* Minimal hero form — only transport, from, to, date, continue */
-.hero-form-card--minimal {
-  max-width: 22rem;
-}
-
-.hero-claim-form--minimal {
+/* Trainline-like hero form: From, To, transport, Out, spaced Continue */
+.hero-claim-form--trainline {
   display: flex;
   flex-direction: column;
-  gap: var(--space-20);
+  gap: var(--space-24);
 }
 
-.hero-claim-form--minimal label {
+.hero-claim-form--trainline label {
   display: flex;
   flex-direction: column;
-  gap: var(--space-6);
+  gap: var(--space-8);
   font-size: var(--text-sm);
   font-weight: 500;
   color: var(--foreground);
   font-family: var(--font-body);
 }
 
-.hero-claim-form--minimal input {
-  padding: var(--space-12) 0;
-  border: none;
-  border-bottom: 2px solid var(--border);
-  background: transparent;
+.hero-claim-form--trainline input {
+  padding: var(--space-12) var(--space-16);
+  border: var(--border-thin);
+  background: var(--background);
   font-size: var(--text-base);
   font-family: var(--font-body);
   color: var(--foreground);
   border-radius: var(--radius);
 }
 
-.hero-claim-form--minimal input:focus {
+.hero-claim-form--trainline input:focus {
   outline: none;
-  border-bottom-width: 4px;
+  border-width: 2px;
+  border-color: var(--foreground);
 }
 
-.hero-claim-form--minimal .btn-hero {
-  margin-top: var(--space-8);
+.hero-claim-form--trainline input::placeholder {
+  color: var(--mutedForeground);
 }
 
-/* Transport type selector — horizontal row, not too wide */
+.hero-form-actions {
+  margin-top: var(--space-32);
+  padding-top: var(--space-24);
+  padding-left: var(--space-12);
+  padding-right: var(--space-12);
+}
+
+@media (min-width: 640px) {
+  .hero-form-actions {
+    padding-left: var(--space-24);
+    padding-right: var(--space-24);
+  }
+}
+
+/* Start form - horizontal layout matching claims table */
+.hero-form-card--start {
+  padding: 0;
+  border: var(--border-thin);
+  background: var(--card);
+}
+
+/* Horizontal form - TrainPal style - compact search bar */
+.hero-form-card--horizontal {
+  padding: var(--space-16) var(--space-24);
+  border: var(--border-thin);
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(8px);
+  border-radius: var(--radius);
+  width: 100%;
+  max-width: 100%;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+@media (min-width: 900px) {
+  .hero-form-card--horizontal {
+    padding: var(--space-20) var(--space-32);
+    max-width: 800px;
+    margin: 0 auto;
+  }
+}
+
+.hero-claim-form--horizontal {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.horizontal-form-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-12);
+  flex-wrap: nowrap;
+  width: 100%;
+}
+
+.horizontal-form-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  flex: 1;
+  min-width: 0;
+}
+
+.horizontal-form-field:nth-child(1),
+.horizontal-form-field:nth-child(2) {
+  flex: 1.2;
+}
+
+.horizontal-form-field:nth-child(3) {
+  flex: 1.3;
+}
+
+.horizontal-form-field--action {
+  flex: 0 0 auto;
+  min-width: 120px;
+  align-self: flex-end;
+  padding-bottom: 0;
+  gap: 0;
+}
+
+.horizontal-form-field--full {
+  flex: 1 1 100%;
+  min-width: 0;
+}
+
+/* Time Selection Styles */
+.time-selection-container {
+  padding: var(--space-24);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-16);
+}
+
+.time-selection-title {
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
+  font-weight: 600;
+  margin: 0;
+  color: var(--foreground);
+}
+
+.time-selection-subtitle {
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  color: var(--mutedForeground);
+  margin: 0;
+}
+
+.time-selection-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+}
+
+.time-selection-option {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-4);
+  padding: var(--space-16);
+  border: var(--border-thin);
+  background: var(--background);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-align: left;
+  width: 100%;
+  font-family: var(--font-body);
+}
+
+.time-selection-option:hover {
+  border-width: 2px;
+  background: var(--muted);
+}
+
+.time-selection-time {
+  font-family: var(--font-mono);
+  font-size: var(--text-lg);
+  font-weight: 600;
+  color: var(--foreground);
+}
+
+.time-selection-details {
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  color: var(--mutedForeground);
+}
+
+.time-selection-back {
+  align-self: flex-start;
+  padding: var(--space-8) var(--space-16);
+  border: var(--border-thin);
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.time-selection-back:hover {
+  background: var(--muted);
+  border-width: 2px;
+}
+
+.horizontal-form-label {
+  font-size: var(--text-xs);
+  font-weight: 500;
+  color: var(--mutedForeground);
+  letter-spacing: 0.02em;
+  margin: 0;
+  line-height: 1.2;
+}
+
+.horizontal-form-input {
+  padding: var(--space-10) var(--space-12);
+  border: var(--border-thin);
+  background: var(--background);
+  font-size: var(--text-sm);
+  font-family: var(--font-body);
+  color: var(--foreground);
+  border-radius: var(--radius);
+  width: 100%;
+  height: 40px;
+  box-sizing: border-box;
+}
+
+@media (min-width: 640px) {
+  .horizontal-form-input {
+    font-size: var(--text-base);
+    padding: var(--space-12) var(--space-16);
+    height: 44px;
+  }
+}
+
+.horizontal-form-input:focus {
+  outline: none;
+  border-width: 2px;
+  border-color: var(--foreground);
+}
+
+.horizontal-form-input::placeholder {
+  color: var(--mutedForeground);
+}
+
+.transport-selector--horizontal {
+  display: flex;
+  gap: 0;
+  border: var(--border-thin);
+  border-radius: var(--radius);
+  overflow: hidden;
+  width: 100%;
+  height: 40px;
+}
+
+.transport-selector--horizontal .transport-opt {
+  flex: 1;
+  padding: 0 var(--space-10);
+  border-right: var(--border-thin);
+  border-radius: 0;
+  font-size: var(--text-xs);
+  min-width: 0;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  white-space: nowrap;
+  font-weight: 500;
+}
+
+.transport-selector--horizontal .transport-opt:last-child {
+  border-right: none;
+}
+
+@media (min-width: 640px) {
+  .transport-selector--horizontal {
+    height: 44px;
+  }
+  
+  .transport-selector--horizontal .transport-opt {
+    padding: 0 var(--space-14);
+    font-size: var(--text-sm);
+  }
+}
+
+@media (min-width: 900px) {
+  .transport-selector--horizontal .transport-opt {
+    padding: 0 var(--space-16);
+  }
+}
+
+.btn-horizontal-submit {
+  padding: var(--space-10) var(--space-24);
+  font-size: var(--text-sm);
+  height: 40px;
+  white-space: nowrap;
+  min-height: auto;
+}
+
+@media (min-width: 640px) {
+  .btn-horizontal-submit {
+    padding: var(--space-12) var(--space-32);
+    font-size: var(--text-base);
+    height: 44px;
+  }
+}
+
+.hero-copy--right {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-16);
+  max-width: 100%;
+}
+
+.app--home .hero-headline {
+  font-size: var(--text-2xl);
+  margin-bottom: var(--space-8);
+  line-height: 1.3;
+  max-width: 100%;
+}
+
+.app--home .hero-sub {
+  font-size: var(--text-base);
+  margin-bottom: 0;
+  line-height: 1.5;
+  max-width: 100%;
+}
+
+@media (min-width: 900px) {
+  .hero-copy--right {
+    text-align: left;
+    max-width: 28rem;
+  }
+  
+  .app--home .hero-headline {
+    font-size: var(--text-3xl);
+  }
+  
+  .app--home .hero-sub {
+    font-size: var(--text-lg);
+  }
+}
+
+.hero-description {
+  font-size: var(--text-sm);
+  color: var(--accentForeground);
+  text-align: center;
+  opacity: 0.9;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+  margin: 0;
+  max-width: 600px;
+}
+
+@media (min-width: 900px) {
+  .hero-description {
+    text-align: center;
+    max-width: 800px;
+  }
+}
+
+.hero-claim-form--start {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.start-form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr 1fr auto;
+  gap: 0;
+  border-bottom: var(--border-hairline);
+  align-items: end;
+}
+
+.start-form-cell {
+  padding: var(--space-16) var(--space-24);
+  border-right: var(--border-hairline);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+
+.start-form-cell:last-child {
+  border-right: none;
+}
+
+.start-form-cell--action {
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-16) var(--space-24);
+}
+
+.start-form-label {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--mutedForeground);
+  margin: 0;
+}
+
+.start-form-input {
+  padding: var(--space-8) 0;
+  border: none;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  color: var(--foreground);
+  width: 100%;
+  transition: border-color 100ms;
+}
+
+.start-form-input:focus {
+  outline: none;
+  border-bottom-color: var(--foreground);
+}
+
+.start-form-input::placeholder {
+  color: var(--mutedForeground);
+}
+
+.transport-selector--start {
+  border: none;
+  display: flex;
+  gap: 0;
+  margin: 0;
+}
+
+.transport-selector--start .transport-opt {
+  flex: 1;
+  padding: var(--space-8) var(--space-12);
+  font-size: var(--text-xs);
+  border-right: var(--border-hairline);
+}
+
+.transport-selector--start .transport-opt:last-child {
+  border-right: none;
+}
+
+.btn-start-submit {
+  padding: var(--space-8) var(--space-16);
+  font-size: var(--text-sm);
+  min-height: auto;
+}
+
+.start-form-extra {
+  padding: var(--space-24);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-16);
+}
+
+.start-form-label-extra {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--foreground);
+  font-family: var(--font-body);
+}
+
+.start-form-input-extra {
+  padding: var(--space-12) var(--space-16);
+  border: var(--border-thin);
+  background: var(--background);
+  font-size: var(--text-base);
+  font-family: var(--font-body);
+  color: var(--foreground);
+  border-radius: var(--radius);
+}
+
+.start-form-input-extra:focus {
+  outline: none;
+  border-width: 2px;
+  border-color: var(--foreground);
+}
+
+.start-form-input-extra::placeholder {
+  color: var(--mutedForeground);
+}
+
+.upload-zone--start {
+  margin: 0;
+}
+
+@media (max-width: 1023px) {
+  .start-form-row {
+    grid-template-columns: 1fr;
+    border-bottom: none;
+  }
+  
+  .start-form-cell {
+    border-right: none;
+    border-bottom: var(--border-hairline);
+    padding: var(--space-16) var(--space-24);
+  }
+  
+  .start-form-cell:last-child {
+    border-bottom: none;
+  }
+  
+  .transport-selector--start {
+    flex-direction: column;
+  }
+  
+  .transport-selector--start .transport-opt {
+    border-right: none;
+    border-bottom: var(--border-hairline);
+  }
+  
+  .transport-selector--start .transport-opt:last-child {
+    border-bottom: none;
+  }
+}
+
+.hero-form-actions .btn-hero {
+  width: 100%;
+  margin: 0;
+  padding: var(--space-16) var(--space-32);
+  box-sizing: border-box;
+}
+
+.form-error {
+  font-size: var(--text-sm);
+  color: var(--mutedForeground);
+  margin: 0 0 var(--space-12);
+  padding: var(--space-12);
+  border-left: 3px solid var(--foreground);
+  background: var(--muted);
+}
+
+/* --------------------------------------------------------------------------
+   How it works — workflow sections (spacious, not blocky)
+   -------------------------------------------------------------------------- */
+
+.workflow-section {
+  padding: var(--space-96) var(--container-padding);
+  max-width: var(--container-max);
+  margin: 0 auto;
+}
+
+.workflow-title {
+  font-family: var(--font-display);
+  font-size: var(--text-2xl);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  margin-bottom: var(--space-64);
+  color: var(--foreground);
+}
+
+.workflow-steps {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-48);
+}
+
+.workflow-step {
+  padding-left: var(--space-48);
+  border-left: var(--border-thin);
+  margin-left: var(--space-12);
+}
+
+.workflow-step-num {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  color: var(--mutedForeground);
+  margin-bottom: var(--space-8);
+}
+
+.workflow-step-title {
+  font-family: var(--font-display);
+  font-size: var(--text-xl);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  margin-bottom: var(--space-12);
+  color: var(--foreground);
+}
+
+.workflow-step-text {
+  font-size: var(--text-base);
+  line-height: 1.6;
+  color: var(--mutedForeground);
+  margin: 0;
+  max-width: 36rem;
+}
+
+/* Claim details page — Premium & contract condition blocks */
+.claim-details-workflow {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-32);
+  margin-bottom: var(--space-48);
+}
+
+.workflow-block {
+  padding: var(--space-32);
+  background: var(--muted);
+  border: none;
+}
+
+.workflow-block-title {
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  margin-bottom: var(--space-12);
+  color: var(--foreground);
+}
+
+.workflow-block--horizontal .workflow-block-title {
+  margin-bottom: var(--space-8);
+}
+
+.workflow-block-text {
+  font-size: var(--text-sm);
+  line-height: 1.6;
+  color: var(--mutedForeground);
+  margin: 0;
+}
+
+/* Transport type selector — horizontal row (Trainline-style segments) */
 .transport-selector {
   display: flex;
   flex-wrap: nowrap;
@@ -471,7 +1127,7 @@
 .claim-details-page {
   width: 100%;
   border-top: var(--border-thick);
-  padding: var(--space-48) var(--container-padding);
+  padding: var(--space-64) var(--container-padding);
   background: var(--background);
 }
 
@@ -480,9 +1136,127 @@
   margin: 0 auto;
 }
 
+.insure-page {
+  width: 100%;
+  border-top: var(--border-thick);
+  padding: var(--space-64) var(--container-padding);
+  background: var(--background);
+}
+
+.insure-inner {
+  max-width: var(--container-max);
+  margin: 0 auto;
+}
+
+.panel--insure {
+  padding: var(--space-48);
+  margin-top: var(--space-32);
+}
+
+.insure-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-24);
+}
+
+.insure-form label {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--foreground);
+  font-family: var(--font-body);
+}
+
+.insure-form input {
+  padding: var(--space-12) var(--space-16);
+  border: var(--border-thin);
+  background: var(--background);
+  font-size: var(--text-base);
+  font-family: var(--font-body);
+  color: var(--foreground);
+  border-radius: var(--radius);
+}
+
+.insure-form input:focus {
+  outline: none;
+  border-width: 2px;
+  border-color: var(--foreground);
+}
+
+.insure-form input::placeholder {
+  color: var(--mutedForeground);
+}
+
+.insure-form input.readonly-field {
+  background: var(--muted);
+  cursor: not-allowed;
+  opacity: 0.8;
+}
+
+.insure-form input.input-error {
+  border-color: var(--foreground);
+  border-width: 3px;
+  background: var(--muted);
+}
+
+.insure-form input.input-error:focus {
+  border-color: var(--foreground);
+  border-width: 3px;
+  outline: none;
+}
+
+.field-error-message {
+  display: block;
+  color: var(--foreground);
+  font-size: var(--text-xs);
+  font-family: var(--font-body);
+  margin-top: var(--space-4);
+  padding-left: var(--space-8);
+  border-left: 3px solid var(--foreground);
+  font-weight: 500;
+}
+
+.flight-details-section,
+.passenger-details-section {
+  margin-bottom: var(--space-32);
+}
+
+.flight-details-title,
+.passenger-details-title {
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
+  font-weight: 600;
+  margin-bottom: var(--space-24);
+  padding-bottom: var(--space-12);
+  border-bottom: var(--border-thin);
+}
+
+.flight-details-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--space-24);
+}
+
+@media (min-width: 768px) {
+  .flight-details-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.form-error {
+  color: var(--foreground);
+  font-size: var(--text-sm);
+  padding: var(--space-12);
+  border: var(--border-thin);
+  background: var(--muted);
+  font-family: var(--font-body);
+}
+
 .claim-details-back {
   display: inline-block;
-  margin-bottom: var(--space-32);
+  margin-bottom: var(--space-48);
   padding: 0;
   border: none;
   background: none;
@@ -503,29 +1277,20 @@
   outline-offset: 2px;
 }
 
-.claim-details-title {
-  font-family: var(--font-display);
-  font-size: var(--text-3xl);
-  font-weight: 600;
-  letter-spacing: -0.02em;
-  margin-bottom: var(--space-24);
-  color: var(--foreground);
-}
-
 .claim-details-summary {
-  padding: var(--space-24);
+  padding: var(--space-32);
   border: var(--border-thin);
-  margin-bottom: var(--space-32);
+  margin-bottom: var(--space-48);
   background: var(--muted);
 }
 
-.claim-details-summary p {
+.claim-details-route {
   margin: 0;
-  font-size: var(--text-lg);
+  font-size: var(--text-xl);
 }
 
-.claim-details-summary p + p {
-  margin-top: var(--space-4);
+.claim-details-meta {
+  margin: var(--space-8) 0 0;
   font-size: var(--text-sm);
   color: var(--mutedForeground);
 }
@@ -534,7 +1299,16 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-24);
-  max-width: 28rem;
+  max-width: 100%;
+  margin-top: var(--space-32);
+  position: relative;
+  z-index: 10;
+}
+
+.claim-details-form button {
+  position: relative;
+  z-index: 11;
+  pointer-events: auto;
 }
 
 .claim-details-form label {
@@ -575,6 +1349,92 @@
   max-width: 20rem;
 }
 
+.btn-submit-full {
+  margin-top: var(--space-32);
+  width: 100%;
+  padding: var(--space-24) var(--space-48);
+  font-size: var(--text-base);
+  position: relative;
+  z-index: 10;
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.btn-submit-full:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.btn-submit-full:not(:disabled):hover {
+  background: var(--background);
+  color: var(--foreground);
+}
+
+.claim-details-form {
+  margin-top: var(--space-32);
+}
+
+.workflow-block--premium,
+.workflow-block--contract {
+  margin-bottom: var(--space-24);
+}
+
+/* Horizontal workflow blocks - title left, value right */
+.workflow-block--horizontal {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--space-24) var(--space-32);
+  border: var(--border-thin);
+  background: var(--muted);
+  gap: var(--space-32);
+}
+
+.workflow-block-left {
+  flex: 1;
+  min-width: 0;
+}
+
+.workflow-block-title {
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  margin-bottom: var(--space-8);
+  color: var(--foreground);
+}
+
+.workflow-block-subtitle {
+  font-size: var(--text-xs);
+  color: var(--mutedForeground);
+  margin: 0;
+  line-height: 1.4;
+}
+
+.workflow-block-right {
+  flex-shrink: 0;
+  text-align: right;
+}
+
+.workflow-block-value {
+  font-family: var(--font-display);
+  font-size: var(--text-3xl);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--foreground);
+  display: block;
+  line-height: 1.2;
+}
+
+.workflow-block-value--text {
+  font-size: var(--text-xl);
+  font-weight: 500;
+  line-height: 1.4;
+  max-width: 24rem;
+  text-align: right;
+}
+
 /* Home eligibility strip */
 .home-eligibility {
   padding: var(--space-24) var(--container-padding);
@@ -613,36 +1473,122 @@
 .claims-page-inner {
   max-width: var(--container-max);
   margin: 0 auto;
-  padding: var(--space-48) var(--container-padding);
+  padding: var(--space-64) var(--container-padding);
 }
 
 @media (min-width: 768px) {
   .claims-page-inner {
-    padding: var(--space-64) var(--container-padding);
+    padding: var(--space-96) var(--container-padding);
   }
 }
 
-.claims-page-title {
-  font-family: var(--font-display);
-  font-size: var(--text-4xl);
-  font-weight: 600;
-  letter-spacing: -0.02em;
+/* My claims page — overview + tabs + table */
+.claims-overview {
+  margin-bottom: var(--space-64);
+}
+
+.claims-tabs {
+  display: flex;
+  gap: 0;
   margin-bottom: var(--space-48);
+  border-bottom: var(--border-thin);
+}
+
+.claims-tab {
+  padding: var(--space-16) var(--space-24);
+  border: none;
+  border-bottom: 3px solid transparent;
+  background: transparent;
+  color: var(--mutedForeground);
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  cursor: pointer;
+  margin-bottom: -1px;
+  transition: color 100ms, border-color 100ms, background 100ms;
+  border-radius: var(--radius);
+}
+
+.claims-tab:hover {
   color: var(--foreground);
 }
 
-.claims-status-section {
-  padding-bottom: var(--space-48);
-  border-bottom: var(--border-thick);
+.claims-tab--active {
+  color: var(--foreground);
+  border-bottom-color: var(--foreground);
 }
 
-.claims-status-section:last-child {
-  border-bottom: none;
-  padding-bottom: 0;
+.claims-tab:focus-visible {
+  outline: 3px solid var(--foreground);
+  outline-offset: 2px;
 }
 
-.claims-status-section .panel-no-padding {
+.claims-panel {
+  width: 100%;
+}
+
+.claims-table-wrap {
+  width: 100%;
+  overflow-x: auto;
   border: var(--border-thin);
+}
+
+.claims-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-sm);
+}
+
+.claims-table th,
+.claims-table td {
+  padding: var(--space-16) var(--space-24);
+  text-align: left;
+  border-bottom: var(--border-hairline);
+}
+
+.claims-table th {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--mutedForeground);
+  background: var(--muted);
+}
+
+.claims-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.claims-table tbody tr:hover {
+  background: var(--muted);
+}
+
+.claims-table-route {
+  font-weight: 500;
+  color: var(--foreground);
+}
+
+.claims-table-date,
+.claims-table-delay {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--mutedForeground);
+}
+
+.claims-table-amount {
+  font-family: var(--font-mono);
+  font-weight: 600;
+  color: var(--foreground);
+}
+
+.claims-table-empty {
+  padding: var(--space-48);
+  text-align: center;
+  color: var(--mutedForeground);
+  font-style: italic;
+  border: var(--border-thin);
+  border-top: none;
 }
 
 .claim-transport {
@@ -743,8 +1689,29 @@
   }
 }
 
-.stat-card:hover {
-  background: var(--foreground);
+/* Different hover colors for each stat card */
+.stat-card--total:hover {
+  background: #1a1a1a;
+  color: var(--accentForeground);
+}
+
+.stat-card--submitted:hover {
+  background: #2a2a2a;
+  color: var(--accentForeground);
+}
+
+.stat-card--pending:hover {
+  background: #3a3a3a;
+  color: var(--accentForeground);
+}
+
+.stat-card--paid:hover {
+  background: #4a4a4a;
+  color: var(--accentForeground);
+}
+
+.stat-card--repaid:hover {
+  background: #5a5a5a;
   color: var(--accentForeground);
 }
 
@@ -1049,11 +2016,69 @@
    -------------------------------------------------------------------------- */
 
 .footer {
-  padding: var(--space-24) var(--container-padding);
+  padding: var(--space-32) var(--container-padding);
   text-align: center;
-  font-size: var(--text-xs);
+  font-size: var(--text-sm);
   color: var(--mutedForeground);
   border-top: var(--border-hairline);
   background: var(--background);
   letter-spacing: 0.02em;
+}
+
+.footer p {
+  margin-bottom: var(--space-16);
+}
+
+.footer-nav {
+  display: flex;
+  justify-content: center;
+  gap: var(--space-24);
+  flex-wrap: wrap;
+}
+
+.footer-link {
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--foreground);
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.footer-link:hover {
+  color: var(--mutedForeground);
+}
+
+.footer-link:focus-visible {
+  outline: 3px solid var(--foreground);
+  outline-offset: 2px;
+}
+
+/* Claims details row with Transaction link */
+.claims-details-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--space-16) var(--space-24);
+  border-top: var(--border-thin);
+  margin-top: var(--space-8);
+  font-size: var(--text-sm);
+  color: var(--mutedForeground);
+}
+
+/* Upload zone for ticket image */
+.upload-zone {
+  margin-top: var(--space-24);
+  padding: var(--space-32);
+  border: 2px dashed var(--border);
+  background: var(--muted);
+  text-align: center;
+}
+
+.upload-zone-text {
+  font-size: var(--text-sm);
+  color: var(--mutedForeground);
+  margin: 0;
 }
