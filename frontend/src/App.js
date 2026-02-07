@@ -52,6 +52,28 @@ function TopBar() {
   const location = useLocation();
   const isActive = (path) => location.pathname === path;
 
+  const [address, setAddress] = useState(null);
+
+  // Connect to MetaMask and set address
+  const ConnectToMetaMask = async () => {
+    try {
+      if (window.ethereum) {
+        const Accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+        setAddress(Accounts[0]);
+        console.log('Connected to MetaMask!', Accounts);
+      } else {
+        console.error('MetaMask not found. Please install MetaMask to use this application.');
+      }
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  const truncateAddress = (addr) => {
+    if (!addr) return '';
+    return `${addr.slice(0, 6)}...`;
+  };
+
   return (
     <header className="topbar">
       <Link to="/" className="topbar-logo">Delay Repay</Link>
@@ -71,9 +93,20 @@ function TopBar() {
         <Link to="/account" className={`topbar-btn ${isActive('/account') ? 'topbar-btn-active' : ''}`}>
           Account
         </Link>
-        <button type="button" className="topbar-btn topbar-btn-outline">
-          Sign in
-        </button>
+        {!address ? (
+          <button
+            type="button"
+            className="topbar-btn topbar-btn-outline"
+            onClick={ConnectToMetaMask}
+          >
+            Connect
+          </button>
+        ) : (
+          <button type="button" className="topbar-btn topbar-btn-outline topbar-wallet-btn" title={address}>
+            <span className="wallet-icon" aria-hidden>🦊</span>
+            <span className="wallet-addr">{truncateAddress(address)}</span>
+          </button>
+        )}
       </nav>
     </header>
   );
