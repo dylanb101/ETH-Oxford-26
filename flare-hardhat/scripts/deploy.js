@@ -6,10 +6,16 @@ async function main() {
   const SimpleStorage = await hre.ethers.getContractFactory("SimpleStorage");
   const simpleStorage = await SimpleStorage.deploy();
 
+  const PayoutEngine = await hre.ethers.getContractFactory("PayoutEngine");
+  const payoutEngine = await PayoutEngine.deploy();
+
   await simpleStorage.waitForDeployment();
+  await payoutEngine.waitForDeployment();
 
   const address = await simpleStorage.getAddress();
+  const payoutEngineAddress = await payoutEngine.getAddress();
   console.log("SimpleStorage deployed to:", address);
+  console.log("PayoutEngine deployed to:", payoutEngineAddress);
 }
 
 main()
