@@ -1,20 +1,171 @@
-* {
+/* ==========================================================================
+   Minimalist Monochrome — Design tokens & global base
+   ========================================================================== */
+
+:root {
+  /* Strict monochrome palette */
+  --background: #ffffff;
+  --foreground: #000000;
+  --muted: #f5f5f5;
+  --mutedForeground: #525252;
+  --accent: #000000;
+  --accentForeground: #ffffff;
+  --border: #000000;
+  --borderLight: #e5e5e5;
+  --card: #ffffff;
+  --cardForeground: #000000;
+  --ring: #000000;
+
+  /* Type scale */
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-base: 1rem;
+  --text-lg: 1.125rem;
+  --text-xl: 1.25rem;
+  --text-2xl: 1.5rem;
+  --text-3xl: 2rem;
+  --text-4xl: 2.5rem;
+  --text-5xl: 3.5rem;
+  --text-6xl: 4.5rem;
+  --text-7xl: 6rem;
+  --text-8xl: 8rem;
+
+  /* Spacing (for consistency) */
+  --space-4: 0.25rem;
+  --space-6: 0.375rem;
+  --space-8: 0.5rem;
+  --space-12: 0.75rem;
+  --space-16: 1rem;
+  --space-24: 1.5rem;
+  --space-32: 2rem;
+  --space-48: 3rem;
+  --space-64: 4rem;
+  --space-96: 6rem;
+  --space-128: 8rem;
+
+  /* Borders — sharp, no radius */
+  --radius: 0;
+  --border-hairline: 1px solid var(--borderLight);
+  --border-thin: 1px solid var(--border);
+  --border-medium: 2px solid var(--border);
+  --border-thick: 4px solid var(--border);
+  --border-ultra: 8px solid var(--border);
+
+  /* Font stacks */
+  --font-display: "Playfair Display", Georgia, serif;
+  --font-body: "Source Serif 4", Georgia, serif;
+  --font-mono: "JetBrains Mono", monospace;
+
+  /* Container */
+  --container-max: 72rem;
+  --container-padding: 1.5rem;
+}
+
+@media (min-width: 768px) {
+  :root {
+    --container-padding: 2rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  :root {
+    --container-padding: 3rem;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Reset & base
+   -------------------------------------------------------------------------- */
+
+*,
+*::before,
+*::after {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
 }
 
-body {
-  margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-    sans-serif;
+html {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
-code {
-  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
-    monospace;
+body {
+  font-family: var(--font-body);
+  font-size: var(--text-base);
+  line-height: 1.625;
+  color: var(--foreground);
+  background-color: var(--background);
 }
 
+/* Layered textures: horizontal lines + noise (minimal opacity) */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background-image: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 1px,
+    var(--foreground) 1px,
+    var(--foreground) 2px
+  );
+  background-size: 100% 4px;
+  opacity: 0.015;
+}
+
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+  opacity: 0.02;
+}
+
+#root {
+  position: relative;
+  z-index: 1;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+code {
+  font-family: var(--font-mono);
+}
+
+/* Skip link — visible, black, for accessibility */
+.skip-link {
+  position: absolute;
+  top: 0;
+  left: 0;
+  padding: var(--space-16) var(--space-24);
+  background: var(--foreground);
+  color: var(--accentForeground);
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  text-decoration: none;
+  z-index: 100;
+  border: none;
+  border-bottom: 2px solid var(--foreground);
+  clip-path: inset(0 0 0 0);
+  transition: none;
+}
+
+.skip-link:focus {
+  outline: 3px solid var(--foreground);
+  outline-offset: 3px;
+}
+
+.skip-link:not(:focus) {
+  clip-path: inset(50% 0 50% 0);
+  height: 1px;
+  width: 1px;
+  overflow: hidden;
+  margin: -1px;
+}
