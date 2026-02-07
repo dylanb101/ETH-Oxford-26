@@ -40,7 +40,27 @@ class QuoteResponse(BaseModel):
     flight_id: str = Field(..., description="Unique flight identifier")
     risk_score: float = Field(..., description="Risk score (0.0 to 1.0)")
     delay_probability: float = Field(..., description="Estimated delay probability (0.0 to 1.0)")
+    delay_threshold_minutes: int = Field(..., description="Minimum delay in minutes to trigger payout")
+    payout_multiplier: float = Field(..., description="Payout multiplier (e.g., 1.5 = 1.5x premium)")
     message: Optional[str] = Field(None, description="Additional information about the quote")
+
+
+class ContractVerificationRequest(BaseModel):
+    """Request schema for contract verification."""
+    flight_number: str = Field(..., description="Flight number")
+    flight_date: str = Field(..., description="Flight date in ISO format (YYYY-MM-DD)")
+    contract_address: str = Field(..., description="Smart contract address")
+    user_address: str = Field(..., description="User wallet address")
+
+
+class ContractVerificationResponse(BaseModel):
+    """Response schema for contract verification."""
+    condition_met: bool = Field(..., description="Whether contract conditions are met")
+    delay_minutes: int = Field(..., description="Actual delay in minutes")
+    threshold_minutes: int = Field(..., description="Required delay threshold")
+    payout_eligible: bool = Field(..., description="Whether payout is eligible")
+    flight_status: str = Field(..., description="Current flight status")
+    payout_amount: Optional[str] = Field(None, description="Payout amount in FLR (if eligible)")
 
 
 class HealthResponse(BaseModel):

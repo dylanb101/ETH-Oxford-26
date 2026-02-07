@@ -1,5 +1,6 @@
 """
 AI Agent for flight risk analysis and premium calculation.
+Acts as an actuary to determine premiums and contract conditions.
 """
 import os
 from typing import Dict, Any, Optional
@@ -11,13 +12,14 @@ from decimal import Decimal
 import json
 import random
 from datetime import datetime
+from aviation_api import AviationStackClient
 
 
-class PremiumOutputParser(BaseOutputParser):
-    """Parse LLM output to extract premium amount."""
+class ActuaryOutputParser(BaseOutputParser):
+    """Parse LLM output to extract premium and contract conditions."""
     
     def parse(self, text: str) -> Dict[str, Any]:
-        """Parse LLM response to extract premium and risk metrics."""
+        """Parse LLM response to extract premium, risk metrics, and contract conditions."""
         try:
             # Try to parse as JSON first
             if '{' in text:
@@ -30,16 +32,20 @@ class PremiumOutputParser(BaseOutputParser):
                 premium = float(data.get('premium', 0))
                 risk_score = float(data.get('risk_score', 0.5))
                 delay_probability = float(data.get('delay_probability', 0.3))
+                delay_threshold_minutes = int(data.get('delay_threshold_minutes', 30))
+                payout_multiplier = float(data.get('payout_multiplier', 1.5))
                 reasoning = data.get('reasoning', '')
                 
                 return {
                     'premium': premium,
                     'risk_score': risk_score,
                     'delay_probability': delay_probability,
+                    'delay_threshold_minutes': delay_threshold_minutes,
+                    'payout_multiplier': payout_multiplier,
                     'reasoning': reasoning
                 }
-        except:
-            pass
+        except Exception as e:
+            print(f"Error parsing LLM output: {e}")
         
         # Fallback: extract numbers from text
         import re
@@ -47,11 +53,15 @@ class PremiumOutputParser(BaseOutputParser):
         premium = float(numbers[0]) if numbers else 10.0
         risk_score = 0.5
         delay_probability = 0.3
+        delay_threshold_minutes = 30
+        payout_multiplier = 1.5
         
         return {
             'premium': premium,
             'risk_score': risk_score,
             'delay_probability': delay_probability,
+            'delay_threshold_minutes': delay_threshold_minutes,
+            'payout_multiplier': payout_multiplier,
             'reasoning': text
         }
 
@@ -63,12 +73,13 @@ class FlightRiskAnalyzer:
     
     def __init__(self, openai_api_key: Optional[str] = None):
         """
-        Initialize the risk analyzer.
+        Initialize the risk analyzer (actuary).
         
         Args:
             openai_api_key: OpenAI API key (if None, uses environment variable)
         """
         self.api_key = openai_api_key or os.getenv('OPENAI_API_KEY')
+        self.aviation_client = AviationStackClient()
         
         # Initialize LLM (use OpenAI if available, otherwise use mock)
         if self.api_key:
@@ -88,14 +99,16 @@ class FlightRiskAnalyzer:
             self.use_llm = False
             print("Warning: OPENAI_API_KEY not set. Using mock risk analysis.")
         
-        # Create prompt template
+        # Create prompt template for actuary analysis
         self.prompt = PromptTemplate(
             input_variables=["flight_number", "flight_date", "departure_airport", 
                            "arrival_airport", "historical_data"],
             template="""
-You are an expert aviation risk analyst for a flight delay insurance dApp on Flare Network.
+You are an expert actuary for a flight delay insurance dApp on Flare Network. Your role is to:
+1. Calculate appropriate insurance premiums based on risk analysis
+2. Determine contract conditions (delay thresholds, payout terms)
 
-Analyze the following flight information and calculate an appropriate insurance premium in FLR (Flare token).
+Analyze the following flight information:
 
 Flight Details:
 - Flight Number: {flight_number}
@@ -110,7 +123,9 @@ Based on this information, provide a JSON response with:
 1. premium: The insurance premium in FLR (typically 5-50 FLR for domestic, 10-100 FLR for international)
 2. risk_score: A risk score from 0.0 (low risk) to 1.0 (high risk)
 3. delay_probability: Estimated probability of delay (0.0 to 1.0)
-4. reasoning: Brief explanation of your analysis
+4. delay_threshold_minutes: Minimum delay in minutes required to trigger payout (typically 15-60 minutes)
+5. payout_multiplier: Multiplier for payout amount (e.g., 1.5 means 1.5x premium payout, typically 1.0-3.0)
+6. reasoning: Brief explanation of your actuarial analysis
 
 Consider factors like:
 - Historical delay rates for this route
@@ -118,13 +133,21 @@ Consider factors like:
 - Weather patterns for the date
 - Aircraft type reliability
 - Airline performance history
+- Typical delay durations when delays occur
+
+The delay_threshold_minutes should be set based on:
+- Higher risk routes: Lower threshold (15-30 min) to be more competitive
+- Lower risk routes: Higher threshold (30-60 min) to reduce payout frequency
+- Industry standard is typically 30-45 minutes
 
 Respond ONLY with valid JSON in this format:
 {{
     "premium": 25.5,
     "risk_score": 0.35,
     "delay_probability": 0.28,
-    "reasoning": "Route has moderate delay history. Weather forecast is clear. Premium reflects standard risk."
+    "delay_threshold_minutes": 30,
+    "payout_multiplier": 1.5,
+    "reasoning": "Route has moderate delay history (28% probability). Setting 30-minute threshold balances competitiveness with risk. Premium reflects standard actuarial pricing."
 }}
 """
         )
@@ -133,14 +156,14 @@ Respond ONLY with valid JSON in this format:
             self.chain = LLMChain(
                 llm=self.llm,
                 prompt=self.prompt,
-                output_parser=PremiumOutputParser()
+                output_parser=ActuaryOutputParser()
             )
     
     def fetch_historical_data(self, flight_number: str, flight_date: str, 
                             departure_airport: Optional[str] = None,
                             arrival_airport: Optional[str] = None) -> str:
         """
-        Fetch historical flight data (placeholder for AviationStack API).
+        Fetch historical flight data using AviationStack API.
         
         Args:
             flight_number: Flight number
@@ -151,20 +174,45 @@ Respond ONLY with valid JSON in this format:
         Returns:
             Formatted historical data string
         """
-        # Placeholder: In production, integrate with AviationStack API
-        # For now, return simulated data
-        
-        # Simulate historical delay rates based on flight number
-        base_delay_rate = hash(flight_number) % 40 / 100  # 0-40% delay rate
-        
-        historical_data = f"""
-Historical Analysis for {flight_number}:
+        # Try to fetch real data from AviationStack
+        try:
+            flight_data = self.aviation_client.get_flight_status(flight_number, flight_date)
+            
+            if flight_data.get('data_source') == 'aviationstack':
+                # Real data from API
+                delay_min = flight_data.get('departure_delay_minutes', 0)
+                status = flight_data.get('status', 'unknown')
+                
+                historical_data = f"""
+Real-time Flight Data from AviationStack for {flight_number}:
+- Current Status: {status}
+- Departure Delay: {delay_min} minutes
+- Departure Airport: {flight_data.get('departure_airport', 'Unknown')}
+- Arrival Airport: {flight_data.get('arrival_airport', 'Unknown')}
+- Airline: {flight_data.get('airline', 'Unknown')}
+- Scheduled Departure: {flight_data.get('departure_scheduled', 'Unknown')}
+- Actual Departure: {flight_data.get('departure_actual', 'Not yet departed')}
+"""
+            else:
+                # Mock data fallback
+                base_delay_rate = hash(flight_number) % 40 / 100
+                historical_data = f"""
+Historical Analysis for {flight_number} (Simulated):
 - Average delay rate: {base_delay_rate:.1%}
 - On-time performance: {1 - base_delay_rate:.1%}
 - Typical delay duration: 15-45 minutes
 - Route reliability: {'High' if base_delay_rate < 0.2 else 'Moderate' if base_delay_rate < 0.3 else 'Low'}
-- Weather impact: Minimal for this route
-- Airport congestion: {'Low' if departure_airport else 'Unknown'}
+"""
+        except Exception as e:
+            # Fallback to simulated data
+            base_delay_rate = hash(flight_number) % 40 / 100
+            historical_data = f"""
+Historical Analysis for {flight_number} (Simulated):
+- Average delay rate: {base_delay_rate:.1%}
+- On-time performance: {1 - base_delay_rate:.1%}
+- Typical delay duration: 15-45 minutes
+- Route reliability: {'High' if base_delay_rate < 0.2 else 'Moderate' if base_delay_rate < 0.3 else 'Low'}
+- Note: Using simulated data (AviationStack API unavailable)
 """
         
         return historical_data
@@ -210,7 +258,7 @@ Historical Analysis for {flight_number}:
     def _mock_analysis(self, flight_number: str, flight_date: str, 
                       historical_data: str) -> Dict[str, Any]:
         """
-        Mock risk analysis when LLM is not available.
+        Mock actuarial analysis when LLM is not available.
         
         Args:
             flight_number: Flight number
@@ -218,7 +266,7 @@ Historical Analysis for {flight_number}:
             historical_data: Historical data context
             
         Returns:
-            Mock analysis results
+            Mock analysis results with contract conditions
         """
         # Deterministic but varied premium based on flight number
         base_premium = 10.0 + (hash(flight_number) % 40)  # 10-50 FLR
@@ -227,16 +275,32 @@ Historical Analysis for {flight_number}:
         delay_probability = 0.2 + (hash(flight_number) % 30) / 100  # 0.2-0.5
         risk_score = delay_probability + (hash(flight_date) % 20) / 100  # Add date variation
         
+        # Determine delay threshold based on risk
+        # Higher risk = lower threshold (more competitive)
+        # Lower risk = higher threshold (reduce payouts)
+        if delay_probability > 0.4:
+            delay_threshold_minutes = 15  # High risk, competitive threshold
+        elif delay_probability > 0.3:
+            delay_threshold_minutes = 30  # Moderate risk, standard threshold
+        else:
+            delay_threshold_minutes = 45  # Low risk, higher threshold
+        
+        # Payout multiplier based on risk (higher risk = higher multiplier)
+        payout_multiplier = 1.0 + (delay_probability * 1.5)  # 1.0 to 2.5x
+        
         # Clamp values
         risk_score = min(1.0, max(0.0, risk_score))
         delay_probability = min(1.0, max(0.0, delay_probability))
+        payout_multiplier = min(3.0, max(1.0, payout_multiplier))
         
-        reasoning = f"Mock analysis: Flight {flight_number} shows {delay_probability:.1%} delay probability. Premium calculated based on historical patterns."
+        reasoning = f"Mock actuarial analysis: Flight {flight_number} shows {delay_probability:.1%} delay probability. Premium: {base_premium} FLR. Contract triggers payout if delay ≥ {delay_threshold_minutes} minutes. Payout: {payout_multiplier:.1f}x premium."
         
         return {
             'premium': base_premium,
             'risk_score': risk_score,
             'delay_probability': delay_probability,
+            'delay_threshold_minutes': delay_threshold_minutes,
+            'payout_multiplier': payout_multiplier,
             'reasoning': reasoning
         }
 
