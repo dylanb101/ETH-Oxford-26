@@ -4,9 +4,13 @@ pragma solidity ^0.8.25;
 import {ContractRegistry} from "@flarenetwork/flare-periphery-contracts/coston2/ContractRegistry.sol";
 import {IFdcVerification} from "@flarenetwork/flare-periphery-contracts/coston2/IFdcVerification.sol";
 import {IWeb2Json} from "@flarenetwork/flare-periphery-contracts/coston2/IWeb2Json.sol";
+import PayoutEngine from "./PayoutEngine.sol";
 
 contract FlightInsuranceFDC {
-
+    PayoutEngine public payoutEngine;
+    constructor(address _payoutEngine) {
+        payoutEngine = PayoutEngine(_payoutEngine);
+    }
 
     enum PolicyStatus {
         Active,
@@ -79,7 +83,7 @@ contract FlightInsuranceFDC {
         // Decode verified API response
         VerifiedDelay memory dto =
             abi.decode(
-                proof.data.responseBody.abi_encoded_data,
+                proof.data.responseBody.abiEncodedData,
                 (VerifiedDelay)
             );
 
@@ -95,7 +99,11 @@ contract FlightInsuranceFDC {
 
             policy.status = PolicyStatus.Settled;
 
-            payable(policy.holder).transfer(policy.payout);
+            payoutEngine.claimPayout(
+                policyId=id,
+                amount=0.1,
+                proof=proof
+            )
 
             emit PolicyPaid(id, policy.payout);
         }
