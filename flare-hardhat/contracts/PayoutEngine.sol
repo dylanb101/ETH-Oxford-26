@@ -31,33 +31,32 @@ contract PayoutEngine {
         merkleRoot = _root;
     }
 
-
     function verifyClaim(
-        address user,
-        uint256 amount,
-        bytes32[] calldata proof
+    address user,
+    uint256 policyId,
+    uint256 amount,
+    bytes32[] calldata proof
     ) public returns (bytes32) {
-        bytes32 leaf = keccak256(
-            abi.encodePacked(user, amount)
-        );
+        bytes32 leaf = keccak256(abi.encodePacked(user, policyId, amount));
 
-        if (claimed[leaf]) {
-            revert("Already claimed");
-        }
+        if (claimed[leaf]) revert("Already claimed");
 
+        bool valid = MerkleProof.verify(proof, merkleRoot, leaf);
+        if (!valid) revert InvalidProof();
 
-        bool valid = MerkleProof.verify(
-            proof,
-            merkleRoot,
-            leaf
-        );
-
-        if (!valid) {
-            revert InvalidProof();
-        }
-
-        claimed[leaf] = true; // no longer a view function since that view means it can't update state. 
-        
+        claimed[leaf] = true;
         return leaf;
     }
+
+
+    function claimPayout(
+    uint256 policyId,
+    uint256 amount,
+    bytes32[] calldata proof
+    ) external {
+        verifyClaim(msg.sender, policyId, amount, proof);
+        fxrp.transfer(msg.sender, amount);
+        emit Claimed(msg.sender, amount);
+    }
+
 }

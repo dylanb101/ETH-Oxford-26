@@ -4,6 +4,14 @@ require("dotenv").config();
 /** @type import('hardhat/config').HardhatUserConfig */
 module.exports = {
   solidity: {
+    compilers: [
+      {
+        version: "0.8.25", // matches the periphery contracts
+      },
+      {
+        version: "0.8.20", // optional, if you have your own contracts
+      },
+    ],
     version: "0.8.20",
     settings: {
       optimizer: {
