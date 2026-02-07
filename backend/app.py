@@ -1,49 +1,72 @@
-from flask import Flask, request, jsonify
-from flask_cors import CORS
+from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
 import os
 from dotenv import load_dotenv
+import uvicorn
 
 load_dotenv()
 
-app = Flask(__name__)
-CORS(app)  # Enable CORS for React frontend
+app = FastAPI(title="FastAPI Backend", version="1.0.0")
+
+# Enable CORS for React frontend
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # In production, replace with specific origins
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # Configuration
 PORT = int(os.getenv('PORT', 5000))
-DEBUG = os.getenv('FLASK_ENV') == 'development'
+DEBUG = os.getenv('FASTAPI_ENV') == 'development'
 
-@app.route('/api/health', methods=['GET'])
-def health_check():
+# Pydantic models for request/response
+class TestRequest(BaseModel):
+    message: str
+
+class HealthResponse(BaseModel):
+    status: str
+    message: str
+
+class TestResponse(BaseModel):
+    success: bool
+    response: str = None
+    error: str = None
+
+class HelloResponse(BaseModel):
+    message: str
+
+@app.get('/api/health', response_model=HealthResponse)
+async def health_check():
     """Health check endpoint"""
-    return jsonify({
-        'status': 'healthy',
-        'message': 'Flask backend is running!'
-    }), 200
+    return HealthResponse(
+        status='healthy',
+        message='FastAPI backend is running!'
+    )
 
-@app.route('/api/test', methods=['POST'])
-def test_endpoint():
+@app.post('/api/test', response_model=TestResponse)
+async def test_endpoint(request_data: TestRequest):
     """Test endpoint that echoes back the message"""
     try:
-        data = request.get_json()
-        message = data.get('message', 'No message provided')
-        
-        return jsonify({
-            'success': True,
-            'response': f'Backend received: {message}'
-        }), 200
+        return TestResponse(
+            success=True,
+            response=f'Backend received: {request_data.message}'
+        )
     except Exception as e:
-        return jsonify({
-            'success': False,
-            'error': str(e)
-        }), 400
+        raise HTTPException(
+            status_code=400,
+            detail=str(e)
+        )
 
-@app.route('/api/hello', methods=['GET'])
-def hello():
+@app.get('/api/hello', response_model=HelloResponse)
+async def hello():
     """Simple hello endpoint"""
-    return jsonify({
-        'message': 'Hello from Flask backend!'
-    }), 200
+    return HelloResponse(
+        message='Hello from FastAPI backend!'
+    )
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=PORT, debug=DEBUG)
+    uvicorn.run(app, host='0.0.0.0', port=PORT, reload=DEBUG)
 
