@@ -1,0 +1,243 @@
+[
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "id",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "address",
+        "name": "holder",
+        "type": "address"
+      }
+    ],
+    "name": "PolicyCreated",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "id",
+        "type": "uint256"
+      }
+    ],
+    "name": "PolicyExpired",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "id",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "payout",
+        "type": "uint256"
+      }
+    ],
+    "name": "PolicyPaid",
+    "type": "event"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "expirationTime",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "minDelayMinutes",
+        "type": "uint256"
+      }
+    ],
+    "name": "createPolicy",
+    "outputs": [],
+    "stateMutability": "payable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "name": "policies",
+    "outputs": [
+      {
+        "internalType": "address",
+        "name": "holder",
+        "type": "address"
+      },
+      {
+        "internalType": "uint256",
+        "name": "premium",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "payout",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "startTime",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "expirationTime",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "minDelayMinutes",
+        "type": "uint256"
+      },
+      {
+        "internalType": "enum FlightInsuranceFDC.PolicyStatus",
+        "name": "status",
+        "type": "uint8"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "policyCount",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "id",
+        "type": "uint256"
+      },
+      {
+        "components": [
+          {
+            "internalType": "bytes32[]",
+            "name": "merkleProof",
+            "type": "bytes32[]"
+          },
+          {
+            "components": [
+              {
+                "internalType": "bytes32",
+                "name": "attestationType",
+                "type": "bytes32"
+              },
+              {
+                "internalType": "bytes32",
+                "name": "sourceId",
+                "type": "bytes32"
+              },
+              {
+                "internalType": "uint64",
+                "name": "votingRound",
+                "type": "uint64"
+              },
+              {
+                "internalType": "uint64",
+                "name": "lowestUsedTimestamp",
+                "type": "uint64"
+              },
+              {
+                "components": [
+                  {
+                    "internalType": "string",
+                    "name": "url",
+                    "type": "string"
+                  },
+                  {
+                    "internalType": "string",
+                    "name": "httpMethod",
+                    "type": "string"
+                  },
+                  {
+                    "internalType": "string",
+                    "name": "headers",
+                    "type": "string"
+                  },
+                  {
+                    "internalType": "string",
+                    "name": "queryParams",
+                    "type": "string"
+                  },
+                  {
+                    "internalType": "string",
+                    "name": "body",
+                    "type": "string"
+                  },
+                  {
+                    "internalType": "string",
+                    "name": "postProcessJq",
+                    "type": "string"
+                  },
+                  {
+                    "internalType": "string",
+                    "name": "abiSignature",
+                    "type": "string"
+                  }
+                ],
+                "internalType": "struct IWeb2Json.RequestBody",
+                "name": "requestBody",
+                "type": "tuple"
+              },
+              {
+                "components": [
+                  {
+                    "internalType": "bytes",
+                    "name": "abiEncodedData",
+                    "type": "bytes"
+                  }
+                ],
+                "internalType": "struct IWeb2Json.ResponseBody",
+                "name": "responseBody",
+                "type": "tuple"
+              }
+            ],
+            "internalType": "struct IWeb2Json.Response",
+            "name": "data",
+            "type": "tuple"
+          }
+        ],
+        "internalType": "struct IWeb2Json.Proof",
+        "name": "proof",
+        "type": "tuple"
+      }
+    ],
+    "name": "resolvePolicy",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "stateMutability": "payable",
+    "type": "receive"
+  }
+]

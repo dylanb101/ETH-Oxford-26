@@ -1,160 +1,175 @@
-# Flare Network Insurance dApp - FastAPI Backend
+# Flare Network Flight Insurance - Backend Server
 
-AI Agent Probability Engine for flight delay insurance on Flare Network.
+Express.js backend server for flight delay insurance on Flare Network using Flare Data Connector (FDC) and AviationStack API.
 
 ## Features
 
-- **AI-Powered Risk Analysis**: Uses LangChain with OpenAI to analyze flight risk and calculate premiums
-- **EIP-712 Cryptographic Signing**: Cryptographically signs quotes for on-chain verification
-- **Flare Network Integration**: Configured for Flare Coston2 Testnet (Chain ID: 114)
-- **18-Decimal Precision**: Handles FLR token amounts with full precision
+- **Express.js Server**: RESTful API server running on port 5000
+- **Flare Blockchain Integration**: Direct connection to Flare Network via ethers.js
+- **FlightInsurance Contract**: Smart contract integration for policy management
+- **FDC Integration**: Uses Flare Data Connector to fetch real-time flight data from AviationStack
+- **Hardhat Integration**: Full Hardhat development environment included
 
 ## Setup
 
-1. Create a virtual environment:
+1. Install dependencies:
 ```bash
-python3 -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+npm install
 ```
 
-2. Install dependencies:
-```bash
-pip install -r requirements.txt
-```
-
-3. Create a `.env` file in the backend directory:
+2. Create a `.env` file in the backend directory:
 ```env
 PORT=5000
-FASTAPI_ENV=development
-
-# Required: Admin wallet private key for signing quotes
-PRIVATE_KEY=0x0000000000000000000000000000000000000000000000000000000000000000
-
-# Flare Network Configuration
-FLARE_CHAIN_ID=114  # Coston2 testnet
-DOMAIN_NAME=Flare Insurance dApp
-DOMAIN_VERSION=1
-
-# Optional: OpenAI API key for AI risk analysis (falls back to mock if not provided)
-OPENAI_API_KEY=sk-your-openai-api-key-here
+PRIVATE_KEY=your_private_key_here
+SIGNER_ADDRESS=0x...  # Backend admin address that signs quotes
+FLIGHT_INSURANCE_ADDRESS=0x...  # Deployed FlightInsurance contract address
+FLARE_DATA_CONNECTOR_ADDRESS=0x...  # FDC contract address on Flare network
+AVIATIONSTACK_API_KEY=your_aviationstack_api_key  # For flight information API
+FLARE_RPC_URL=https://flare-api.flare.network/ext/C/rpc
+COSTON_RPC_URL=https://coston-api.flare.network/ext/C/rpc
+COSTON2_RPC_URL=https://coston2-api.flare.network/ext/C/rpc
 ```
 
-4. Run the server:
+3. Start the server:
 ```bash
-python main.py
+npm start
+# or for development with auto-reload:
+npm run dev
 ```
 
-Or using uvicorn directly:
+## Available Networks
+
+- **Flare Mainnet** (Chain ID: 14)
+- **Coston Testnet** (Chain ID: 16)
+- **Coston2 Testnet** (Chain ID: 114) - Recommended for testing
+
+## Commands
+
+### Server Commands
+- `npm start` - Start Express.js server
+- `npm run dev` - Start server with nodemon (auto-reload)
+
+### Hardhat Commands
+- `npm run compile` - Compile contracts
+- `npm run test` - Run tests
+- `npm run deploy:flare` - Deploy to Flare mainnet
+- `npm run deploy:coston` - Deploy to Coston testnet
+- `npm run deploy:coston2` - Deploy to Coston2 testnet
+- `npm run deploy:flight-insurance` - Deploy FlightInsurance contract to Coston2
+- `npm run node` - Start local Hardhat node
+
+## Deploy FlightInsurance Contract
+
 ```bash
-uvicorn main:app --reload --host 0.0.0.0 --port 5000
+# Deploy to Coston2 testnet
+npx hardhat run scripts/deploy-flight-insurance.js --network coston2
+
+# Deploy to Flare mainnet
+npx hardhat run scripts/deploy-flight-insurance.js --network flare
 ```
 
-The server will run on `http://localhost:5000` by default.
+## Contract Architecture
 
-## API Documentation
+### FlightInsurance.sol
 
-FastAPI automatically generates interactive API documentation:
-- Swagger UI: `http://localhost:5000/docs`
-- ReDoc: `http://localhost:5000/redoc`
+Main contract that:
+- Stores insurance policies with flight details and terms
+- Verifies EIP-712 signed quotes from backend
+- Uses FDC to fetch flight status from AviationStack API
+- Automatically processes payouts when delay conditions are met
+
+### Key Functions
+
+- `purchasePolicy()`: Purchase insurance with signed quote
+- `verifyContract()`: Verify flight status using FDC and AviationStack
+- `claimPayout()`: Claim payout if conditions are met
+
+### Policy Structure
+
+```solidity
+struct Policy {
+    address user;
+    string flightNumber;
+    string flightDate;
+    uint256 premium;              // Premium paid in Wei
+    uint256 payoutAmount;         // Payout if conditions met
+    uint256 delayThresholdMinutes; // Minimum delay to trigger payout
+    uint256 deadline;            // Quote deadline
+    uint256 purchaseTime;         // When policy was purchased
+    bool active;                  // Policy status
+    bool claimed;                 // Whether payout claimed
+    bytes32 flightId;             // Unique flight identifier
+}
+```
+
+## Flare Data Connector (FDC)
+
+FDC allows smart contracts to request external data from APIs like AviationStack:
+
+1. Contract calls `flareDataConnector.requestData()` with API URL
+2. FDC fetches data from AviationStack API
+3. Contract receives response and verifies flight delay
+4. If conditions met, payout is processed
 
 ## API Endpoints
 
-### `POST /api/v1/quote`
-Create an insurance quote for a flight.
+### Health & Info
+- `GET /api/health` - Health check
+- `GET /api/network` - Get Flare network information
+- `GET /api/contract/info` - Get FlightInsurance contract information
+- `GET /api/signer/address` - Get signer address (if configured)
 
-**Request Body:**
-```json
-{
-  "user_address": "0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb0",
-  "flight_number": "AA123",
-  "flight_date": "2024-12-25",
-  "departure_airport": "JFK",
-  "arrival_airport": "LAX"
-}
-```
+### Flight Information
+- `POST /api/flight/info` - Fetch flight information from AviationStack API
+  - Request body: `{ "flightNumber": "BA297", "flightDate": "2024-12-25" }`
+  - Returns parsed flight data from AviationStack
 
-**Response:**
-```json
-{
-  "premium": "25000000000000000000",
-  "deadline": 1735084800,
-  "signature": "0x...",
-  "flight_id": "0x...",
-  "risk_score": 0.35,
-  "delay_probability": 0.28,
-  "message": "Route has moderate delay history..."
-}
-```
+### Contract Purchase
+- `POST /api/contract/prepare-purchase` - Prepare transaction data for MetaMask
+  - Request body: `{ "premium": "10.5", "expirationTime": 1735689600, "minDelayMinutes": 30, "payoutAmount": "15.75", "merkleProof": [] }`
+  - Returns transaction object ready for MetaMask to send C2FLR
 
-### `GET /api/v1/signer-address`
-Get the address of the signing wallet (for verification).
+### Contract Interactions
+- `GET /api/contract/policy-count` - Get total number of policies
+- `GET /api/contract/policy/:policyId` - Get policy details by ID
+- `POST /api/contract/create-policy` - Get transaction data for creating a policy
+- `POST /api/contract/resolve-policy` - Get transaction data for resolving a policy
 
-### `GET /api/health`
-Health check endpoint.
+### Account
+- `GET /api/account/balance/:address` - Get account balance in FLR
 
-## Architecture
+## Integration Flow
 
-### File Structure
+1. Express.js backend provides API endpoints for contract interactions
+2. Frontend calls backend endpoints to get transaction data
+3. Frontend sends transactions from user's wallet
+4. Contract verifies and stores policies
+5. After flight, contract uses FDC to check AviationStack
+6. If delay threshold met, user can claim payout
+
+## Project Structure
+
 ```
 backend/
-├── main.py              # FastAPI application and endpoints
-├── schemas.py           # Pydantic models for validation
-├── signing_utils.py    # EIP-712 signing utilities
-├── ai_agent.py         # LangChain-based risk analysis
-├── requirements.txt    # Python dependencies
-└── README.md           # This file
+├── server.js                      # Express.js server
+├── contracts/
+│   ├── FlightInsurance.sol        # Main insurance contract
+│   ├── PayoutEngine.sol           # Payout engine contract
+│   └── interfaces/
+│       └── IFlareDataConnector.sol # FDC interface
+├── scripts/
+│   └── deploy-flight-insurance.js # Deployment script
+├── test/
+│   └── FlightInsurance.test.js   # Contract tests
+├── artifacts/                     # Compiled contracts
+├── abi/                           # Contract ABIs
+├── hardhat.config.js
+└── package.json
 ```
-
-### Key Components
-
-1. **AI Agent (`ai_agent.py`)**: 
-   - Uses LangChain to create a risk analysis chain
-   - Analyzes flight data and calculates premiums
-   - Falls back to mock analysis if OpenAI API key is not provided
-
-2. **Signing Utils (`signing_utils.py`)**:
-   - Implements EIP-712 signing for quote verification
-   - Handles FLR token precision (18 decimals)
-   - Creates deterministic flight IDs
-
-3. **Schemas (`schemas.py`)**:
-   - Pydantic models for request/response validation
-   - Validates Ethereum addresses and date formats
 
 ## Security Notes
 
-- **Private Key**: Never commit your `.env` file or private key to version control
-- **EIP-712**: Quotes are cryptographically signed to prevent tampering
-- **Precision**: All premium amounts are handled in Wei (18 decimals) for accuracy
-
-## Testing
-
-Test the quote endpoint:
-```bash
-curl -X POST "http://localhost:5000/api/v1/quote" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "user_address": "0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb0",
-    "flight_number": "AA123",
-    "flight_date": "2024-12-25",
-    "departure_airport": "JFK",
-    "arrival_airport": "LAX"
-  }'
-```
-
-## Integration with Flare Smart Contract
-
-The signed quote can be verified on-chain using EIP-712 signature verification. The smart contract should:
-1. Recover the signer address from the signature
-2. Verify it matches the expected admin address
-3. Check the deadline has not passed
-4. Verify the premium amount matches the signature
-
-## Future Enhancements
-
-- Integrate with AviationStack API for real flight data
-- Add caching for risk analysis results
-- Implement quote expiration and renewal
-- Add support for multiple insurance tiers
-- Implement rate limiting and authentication
-
+- Never commit your `.env` file or private keys
+- Verify FDC address on your target network
+- Test thoroughly on testnet before mainnet deployment
+- The signer address must match the backend's signing wallet
