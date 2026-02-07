@@ -9,9 +9,13 @@ from contextlib import asynccontextmanager
 from dotenv import load_dotenv
 import uvicorn
 
-from schemas import QuoteRequest, QuoteResponse, HealthResponse
+from schemas import (
+    QuoteRequest, QuoteResponse, HealthResponse,
+    ContractVerificationRequest, ContractVerificationResponse
+)
 from signing_utils import QuoteSigner
 from ai_agent import FlightRiskAnalyzer
+from aviation_api import AviationStackClient
 
 
 # Load environment variables
@@ -31,12 +35,13 @@ if not PRIVATE_KEY:
 # Initialize services
 quote_signer = None
 risk_analyzer = None
+aviation_client = None
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Lifespan context manager for startup/shutdown."""
-    global quote_signer, risk_analyzer
+    global quote_signer, risk_analyzer, aviation_client
     
     # Startup
     print("Initializing Flare Insurance dApp backend...")
@@ -51,9 +56,13 @@ async def lifespan(app: FastAPI):
     )
     print(f"Quote signer initialized. Signer address: {quote_signer.get_signer_address()}")
     
-    # Initialize AI risk analyzer
+    # Initialize AI risk analyzer (actuary)
     risk_analyzer = FlightRiskAnalyzer(openai_api_key=OPENAI_API_KEY)
-    print("AI Risk Analyzer initialized.")
+    print("AI Actuary (Risk Analyzer) initialized.")
+    
+    # Initialize AviationStack client
+    aviation_client = AviationStackClient()
+    print("AviationStack client initialized.")
     
     yield
     
@@ -93,6 +102,13 @@ def get_risk_analyzer() -> FlightRiskAnalyzer:
     return risk_analyzer
 
 
+def get_aviation_client() -> AviationStackClient:
+    """Dependency to get aviation client."""
+    if aviation_client is None:
+        raise HTTPException(status_code=503, detail="Aviation client not initialized")
+    return aviation_client
+
+
 @app.get('/api/health', response_model=HealthResponse)
 async def health_check():
     """Health check endpoint."""
@@ -129,6 +145,8 @@ async def create_quote(
         premium_flr = risk_analysis['premium']
         risk_score = risk_analysis['risk_score']
         delay_probability = risk_analysis['delay_probability']
+        delay_threshold_minutes = risk_analysis.get('delay_threshold_minutes', 30)
+        payout_multiplier = risk_analysis.get('payout_multiplier', 1.5)
         reasoning = risk_analysis.get('reasoning', '')
         
         # Step 2: Convert premium to Wei (18 decimals)
@@ -152,7 +170,7 @@ async def create_quote(
             deadline=deadline
         )
         
-        # Step 6: Return quote response
+        # Step 6: Return quote response with contract conditions
         return QuoteResponse(
             premium=signer.wei_to_flr(premium_wei),  # Return as string for precision
             deadline=deadline,
@@ -160,6 +178,8 @@ async def create_quote(
             flight_id=flight_id,
             risk_score=risk_score,
             delay_probability=delay_probability,
+            delay_threshold_minutes=delay_threshold_minutes,
+            payout_multiplier=payout_multiplier,
             message=reasoning
         )
         
@@ -177,6 +197,53 @@ async def get_signer_address(signer: QuoteSigner = Depends(get_quote_signer)):
         "signer_address": signer.get_signer_address(),
         "chain_id": signer.chain_id
     }
+
+
+@app.post('/api/v1/verify-contract', response_model=ContractVerificationResponse)
+async def verify_contract(
+    request: ContractVerificationRequest,
+    client: AviationStackClient = Depends(get_aviation_client)
+):
+    """
+    Verify if insurance contract conditions are met using AviationStack API.
+    This endpoint checks flight status and determines if payout is eligible.
+    """
+    try:
+        # Get flight status from AviationStack
+        flight_data = client.get_flight_status(
+            request.flight_number,
+            request.flight_date
+        )
+        
+        # Get contract conditions (we need to fetch from blockchain or store them)
+        # For now, we'll use a default threshold - in production, fetch from contract
+        delay_threshold_minutes = 30  # Default, should be fetched from contract
+        
+        # Check contract conditions
+        condition_check = client.check_contract_conditions(
+            flight_data,
+            delay_threshold_minutes
+        )
+        
+        # Calculate payout amount if eligible
+        payout_amount = None
+        if condition_check['payout_eligible']:
+            # In production, fetch premium from contract and calculate payout
+            # For now, return indication that payout is eligible
+            payout_amount = "0"  # Should be calculated from contract data
+        
+        return ContractVerificationResponse(
+            condition_met=condition_check['condition_met'],
+            delay_minutes=condition_check['delay_minutes'],
+            threshold_minutes=condition_check['threshold_minutes'],
+            payout_eligible=condition_check['payout_eligible'],
+            flight_status=condition_check['flight_status'],
+            payout_amount=payout_amount
+        )
+        
+    except Exception as e:
+        print(f"Error verifying contract: {e}")
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
 
 if __name__ == '__main__':
