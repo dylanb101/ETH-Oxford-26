@@ -121,6 +121,31 @@
   margin-left: var(--space-8);
 }
 
+/* Wallet button (connect + connected display) */
+.topbar-wallet-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+}
+
+.wallet-icon {
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #fff 0%, #f7f7f7 100%);
+  font-size: 16px;
+}
+
+.wallet-addr {
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
 .topbar-btn:focus-visible {
   outline: 3px solid var(--foreground);
   outline-offset: 2px;
