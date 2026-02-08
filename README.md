@@ -8,15 +8,14 @@
 
 ## 📘 Introduction
 
-This project implements a complete decentralized insurance solution that combines blockchain smart contracts, oracles, AI-powered actuarial analysis, and external flight data APIs. Users can purchase flight insurance policies that automatically pay out when flights are delayed, without any manual claims processing.
+This project implements a complete decentralized insurance solution that combines blockchain smart contracts, (proposed AI-powered actuarial analysis), and external flight data APIs (when they aren't trying to scam us). Users can purchase flight insurance policies that automatically pay out when flights are delayed, with the click of one button.
 
 ## ✨ Features
 
-- 🔗 **Smart Contracts on Flare**: Automates policy creation, verification, and payouts on Coston2 testnet
-- 🧠 **Decentralized Oracle Integration**: Powered by Flare Data Connector (FDC)
-- 🌐 **FastAPI Backend**: Handles signing, verification, and API integration
-- 💻 **React Frontend**: User-friendly UI for policy interaction (optional)
-- 🔐 **EIP-712 Signature Verification**: Ensures secure, verifiable off-chain data
+- 🔗 **Smart Contracts on Flare**: Automates policy creation, verification, and payouts on Coston2 testnet.
+- 🧠 **Decentralized Oracle Integration**: Powered by Flare Data Connector (FDC).
+- 🌐 **Node / Express js Backend**: Handles signing, verification, and API integration.
+- 💻 **React Frontend**: User-friendly UI for policy interaction.
 
 ## 🏗️ Architecture
 
@@ -38,55 +37,32 @@ This project implements a complete decentralized insurance solution that combine
 ### ✅ Prerequisites
 
 - **Node.js** v18+
-- **Python** 3.8+
 - **Flare wallet** with Coston2 testnet access
 ## 🚀 Quick Start
 
-### 1️⃣ Backend Setup (FastAPI)
 
-```bash
-# Navigate to backend directory
-cd backend/
 
-# Create and activate virtual environment
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-
-# Install dependencies
-pip install -r requirements.txt
-
-# Configure environment variables
-cp .env.example .env
-```
-
-Edit `.env` file:
-```env
-PRIVATE_KEY=your_wallet_private_key
-OPENAI_API_KEY=your_openai_key  # Optional
-AVIATIONSTACK_API_KEY=your_aviationstack_key  # Optional
-```
-
-```bash
-# Run the backend
-python main.py
-# Or using uvicorn
-uvicorn main:app --reload
-```
-
-Backend will be available at **http://localhost:5000**  
-Swagger docs at **http://localhost:5000/docs**
-
-### 2️⃣ Smart Contract Setup (Hardhat)
+### 1️⃣ Smart Contract Setup (Hardhat) and Meta Mask Account
 
 ```bash
 # Navigate to smart contract directory
-cd flare-hardhat/
+cd apps/contracts
 
 # Install dependencies
 npm install
 
 # Configure environment variables
 cp .env.example .env
+
+# Compile artifacts
+npm compile
+
+# Create Meta Mask account
+# Put Private Key from account into .env file
+
+# Deploy files on the Flare testnet (coston2)
+npx hardhat run scripts/deploy.js --network coston2
+
 ```
 
 Edit `.env` file:
@@ -97,15 +73,27 @@ FDC_ADDRESS=flare_data_connector_address
 COSTON2_RPC_URL=https://coston2-api.flare.network/ext/bc/C/rpc
 ```
 
-```bash
-# Compile contracts
-npm run compile
 
-# Deploy to Coston2 testnet
-npm run deploy:coston2
+### 2️⃣ Backend (Node.js / Express.js) 
+
+Edit `.env` file:
+```env
+PRIVATE_KEY=your_wallet_private_key
+SIGNER_ADDRESS=your_signer_address
+FDC_ADDRESS=flare_data_connector_address
+COSTON2_RPC_URL=https://coston2-api.flare.network/ext/bc/C/rpc
 ```
 
-### 3️⃣ Frontend Setup (Optional)
+```bash
+# Navigate to backend directory
+cd backend/
+npm install
+npm run start
+```
+
+Backend will be available at **http://localhost:5000**  
+
+### 3️⃣ Frontend Setup 
 
 ```bash
 # Navigate to frontend directory
@@ -116,49 +104,15 @@ npm install
 
 # Configure API endpoint
 # Update src/config.js with your backend URL
-```
 
 Edit `src/config.js`:
-```javascript
 export const API_URL = 'http://localhost:5000';
-```
 
-```bash
 # Start development server
 npm start
 ```
 
 Frontend will be available at **http://localhost:3000**
-
-## 🧪 Testing the Application
-
-### Step 1: Get a Quote
-
-```bash
-curl -X POST http://localhost:5000/quote \
-  -H "Content-Type: application/json" \
-  -d '{
-    "flight_number": "BA123",
-    "departure_date": "2026-03-15",
-    "coverage_amount": 1000
-  }'
-```
-
-### Step 2: Purchase Policy
-
-Use the smart contract interface or frontend to:
-1. Connect your wallet
-2. Enter flight details
-3. Pay the premium
-4. Receive policy NFT (future feature)
-
-### Step 3: Claim Payout
-
-If flight is delayed beyond threshold:
-1. Backend fetches delay data
-2. Oracle verifies the data
-3. Smart contract automatically processes payout
-4. Funds sent to policyholder
 
 ## 📂 Project Structure
 
@@ -191,13 +145,21 @@ flight-insurance-dapp/
 - Ethers.js (Web3 Integration)
 
 **Backend:**
-- FastAPI (Python Web Framework)
-- TO WRITE DYLAN!!! TO WRITE WORKFLOW HERE ################################
+- Node / Express js
 
 **Frontend:**
 - React.js
 - Web3.js / Ethers.js
 - Material-UI / Tailwind CSS
+
+**"Proposed" Workflow**
+- A user enters the website with an already booked plane ticket
+- They enter the route number and the date.
+- We then display whether there are multiple flights and get the user to pick the one they want to insure their ticket for.
+- We then retrieve the rest of the information about the flight to the user.
+- We also check their booking confirmation to confirm they have bought a ticket.
+- The backend then provides a premium for the user to pay to insure their ticket.
+- Once the flight has happened it would appear as journey complete in their dashboard and if there was a delay within a reasonable period the user would click redeem in order to gain the original price of the ticket.
 
 ## 🏆 Built For
 
