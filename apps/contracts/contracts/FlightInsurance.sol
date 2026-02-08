@@ -26,12 +26,9 @@ contract FlightInsuranceFDC {
     Policy[] public policies;
     PayoutEngine public payoutEngine;
 
-    // Mapping to store Merkle proofs for each policy
-    mapping(uint256 => bytes32[]) public policyProofs;
-
-    event PolicyCreated(uint256 id, address holder);
-    event PolicyPaid(uint256 id, uint256 payout);
-    event PolicyExpired(uint256 id);
+    event PolicyCreated(uint256 indexed id, address indexed holder);
+    event PolicyPaid(uint256 indexed id, uint256 payout);
+    event PolicyExpired(uint256 indexed id);
 
     constructor(address _payoutEngine) {
         payoutEngine = PayoutEngine(_payoutEngine);
@@ -40,8 +37,7 @@ contract FlightInsuranceFDC {
     function createPolicy(
         uint256 expirationTime,
         uint256 minDelayMinutes,
-        uint256 payoutAmount,
-        bytes32[] calldata merkleProof
+        uint256 payoutAmount
     ) external payable {
         require(msg.value > 0, "Premium required");
         require(expirationTime > block.timestamp, "Invalid expiry");
@@ -58,43 +54,47 @@ contract FlightInsuranceFDC {
             })
         );
 
-        uint256 policyId = policies.length - 1;
-        policyProofs[policyId] = merkleProof;
-
-        emit PolicyCreated(policyId, msg.sender);
+        emit PolicyCreated(policies.length - 1, msg.sender);
     }
 
     function resolvePolicy(
         uint256 policyId,
-        IWeb2Json.Proof calldata proof
+        IWeb2Json.Proof calldata proof,
+        bytes32[] calldata merkleProof
     ) external {
         Policy storage policy = policies[policyId];
-        require(policy.status == PolicyStatus.Active, "Not active");
+        require(policy.status == PolicyStatus.Active, "Policy not active");
 
-        // Verify Web2Json proof via Flare FDC
-        bool valid = ContractRegistry.getFdcVerification().verifyWeb2Json(proof);
+        // Verify FDC proof
+        bool valid = ContractRegistry
+            .getFdcVerification()
+            .verifyWeb2Json(proof);
+
         require(valid, "Invalid FDC proof");
 
-        // Decode verified API response
-        VerifiedDelay memory dto = abi.decode(proof.data.responseBody.abiEncodedData, (VerifiedDelay));
+        // Decode verified delay
+        VerifiedDelay memory dto =
+            abi.decode(
+                proof.data.responseBody.abiEncodedData,
+                (VerifiedDelay)
+            );
 
-        // Expired case
+        // Expiration check
         if (block.timestamp > policy.expirationTime) {
             policy.status = PolicyStatus.Expired;
             emit PolicyExpired(policyId);
             return;
         }
 
-        // Delay payout logic
+        // Payout condition
         if (dto.delayMinutes >= policy.minDelayMinutes) {
             policy.status = PolicyStatus.Settled;
 
-            // Pass Merkle proof to payout contract
             payoutEngine.claimPayout(
                 policy.holder,
                 policyId,
                 policy.payout,
-                policyProofs[policyId]
+                merkleProof
             );
 
             emit PolicyPaid(policyId, policy.payout);

@@ -1,12 +1,13 @@
 import axios from 'axios';
 
-const AVIATION_API_KEY = process.env.REACT_APP_AVIATIONSTACK_API_KEY || process.env.REACT_APP_AVIATION_API_KEY;
+// Backend API base URL - defaults to localhost:5000 in development
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
 
 /**
- * Fetches flight data from AviationStack API
+ * Fetches flight data from backend API endpoint
  * @param {string} flightNumber - Flight IATA code (e.g., "BA297")
  * @param {string} flightDate - Flight date in YYYY-MM-DD format
- * @returns {Promise<Array>} Array of flight objects from API response
+ * @returns {Promise<Array>} Array of flight objects (raw API data for compatibility with parseFlightData)
  */
 export async function fetchFlightData(flightNumber, flightDate) {
   // Validate flight number format (e.g., "BA297", "AA100")
@@ -27,40 +28,53 @@ export async function fetchFlightData(flightNumber, flightDate) {
     }
   }
   
-  const API_URL = `https://api.aviationstack.com/v1/flights`;
+  const API_URL = `${API_BASE_URL}/api/flight/info`;
   
   try {
-    const params = {
-      access_key: AVIATION_API_KEY,
-      flight_iata: cleanFlightNumber,
-    };
+    const response = await axios.post(API_URL, {
+      flightNumber: cleanFlightNumber,
+      flightDate: formattedDate
+    });
     
-    // Add flight_date parameter if provided
-    if (formattedDate) {
-      params.flight_date = formattedDate;
+    if (response.data && response.data.success && response.data.flights && response.data.flights.length > 0) {
+      // Extract raw flight data from backend response for compatibility with parseFlightData
+      // The backend returns flights with a 'raw' field containing the original API data
+      return response.data.flights.map(flight => flight.raw || flight);
     }
     
-    const response = await axios.get(API_URL, { params });
-    
-    if (response.data && response.data.data && response.data.data.length > 0) {
-      return response.data.data; // Return all matching flights
-    }
     throw new Error('Flight not found');
   } catch (error) {
-    console.error('AviationStack API error:', error);
+    console.error('Backend API error:', error);
     
-    // If API key is missing or API fails, return mock data for development/testing
-    if (!AVIATION_API_KEY || AVIATION_API_KEY === 'YOUR_API_KEY_HERE' || error.response?.status === 401) {
-      console.warn('Using mock flight data. Please set REACT_APP_AVIATIONSTACK_API_KEY environment variable for production.');
-      return getMockFlightData(cleanFlightNumber, formattedDate, match);
+    // Handle different error types
+    if (error.response) {
+      // Backend returned an error response
+      const status = error.response.status;
+      const errorMessage = error.response.data?.error || error.message;
+      
+      if (status === 400) {
+        throw new Error(errorMessage || 'Invalid request. Please check your flight number and date.');
+      }
+      if (status === 404) {
+        throw new Error('Flight not found');
+      }
+      if (status === 429) {
+        throw new Error('API rate limit exceeded. Please try again later.');
+      }
+      if (status === 503) {
+        // Backend might return mock data in error response
+        if (error.response.data?.mockData) {
+          return error.response.data.mockData;
+        }
+        throw new Error(errorMessage || 'Flight API service is temporarily unavailable. Please try again later.');
+      }
+      
+      throw new Error(errorMessage || 'Failed to fetch flight data. Please check the flight number and date and try again.');
     }
     
-    // Re-throw API errors
-    if (error.response?.status === 429) {
-      throw new Error('API rate limit exceeded. Please try again later.');
-    }
-    if (error.response?.status >= 500) {
-      throw new Error('Flight API service is temporarily unavailable. Please try again later.');
+    // Network error or other issues
+    if (error.code === 'ECONNREFUSED' || error.message.includes('Network Error')) {
+      throw new Error('Cannot connect to backend server. Please make sure the backend is running on ' + API_BASE_URL);
     }
     
     throw new Error(error.message || 'Failed to fetch flight data. Please check the flight number and date and try again.');
@@ -112,7 +126,7 @@ export function parseFlightData(apiFlights) {
  * @param {Array} match - Regex match result
  * @returns {Array} Mock flight data
  */
-function getMockFlightData(cleanFlightNumber, formattedDate, match) {
+export function getMockFlightData(cleanFlightNumber, formattedDate, match) {
   const [, airlineCode, flightNum] = match;
   const baseDate = formattedDate ? new Date(formattedDate) : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
   

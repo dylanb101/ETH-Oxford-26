@@ -1,7 +1,10 @@
 import React, { useState, useMemo } from 'react';
+import { BrowserProvider, Contract, parseEther } from "ethers";
 import { BrowserRouter as Router, Routes, Route, Link, useLocation, useNavigate } from 'react-router-dom';
-import { fetchFlightData, parseFlightData } from './services/aviationStackService';
+import { fetchFlightData, parseFlightData, getMockFlightData } from './services/aviationStackService';
 import './App.css';
+import FlightDelayFactoryABI from "./abis/FlightDelayFactory.json";
+import FlightInsuranceABI from "./abis/FlightInsuranceFDC.json";
 
 const DELAY_THRESHOLD_MINUTES = 120; // Contract condition: payout if delay >= 2hrs
 
@@ -302,7 +305,7 @@ function HomePage() {
                   <p className="hero-description">Instant delay insurance powered by blockchain — No claims, just code</p>
                 </div>
 
-                {/* Slogan text - right side */}
+                 {/* Slogan text - right side */}
                 <div className="hero-copy hero-copy--right">
                   <p className="hero-headline">Delay insurance on your journey.</p>
                 </div>
@@ -457,60 +460,91 @@ function InsurePage() {
     setShowInfoBars(true);
   };
 
-  // Final submit: create claim and navigate
-  const handleSubmitClaim = (e) => {
+  
+  // Example handleSubmitClaim function
+  const handleSubmitClaim = async (
+    e,           // user's wallet address
+  ) => {
     e.preventDefault();
-    
-    // Use submittedTicketRef (stored from first submission) or current form.ticketRef as fallback
-    const ticketRef = submittedTicketRef || form.ticketRef;
-    
-    // Validate required fields for final submission
-    const errors = {};
-    if (!form.from || form.from.trim() === '') {
-      errors.from = 'This field is required';
+    try {
+      console.log("🚀 Submitting policy creation transaction...");
+
+      // 1️⃣ Get provider from MetaMask
+      const provider = new BrowserProvider(window.ethereum);
+
+      // 2️⃣ Request wallet access
+      await provider.send("eth_requestAccounts", []);
+
+      // 3️⃣ Get signer (THIS IS THE IMPORTANT PART)
+      const signer = await provider.getSigner();
+
+
+      const insuranceContract = new Contract(
+        process.env.REACT_APP_INSURANCE_ADDRESS,
+        FlightInsuranceABI.abi,
+        signer
+      );
+      const expirationTime = 2;
+      const minDelayMinutes = 1;
+      const payoutAmount = 1;
+
+
+      
+
+      // 1️⃣ Send transaction to smart contract
+      const tx = await insuranceContract.createPolicy(
+        expirationTime,
+        minDelayMinutes,
+        payoutAmount,
+      );
+
+      console.log("Transaction sent, waiting for confirmation...", tx.hash);
+
+      // 2️⃣ Wait for transaction confirmation
+      const receipt = await tx.wait();
+      console.log("Transaction confirmed:", receipt.transactionHash);
+
+      // 3️⃣ Parse logs to extract PolicyCreated event
+      const event = receipt.logs
+        .map((log) => {
+          try {
+            return insuranceContract.interface.parseLog(log);
+          } catch {
+            return null;
+          }
+        })
+        .find((e) => e && e.name === "PolicyCreated");
+
+      if (!event) throw new Error("PolicyCreated event not found in transaction logs");
+
+      const policyId = Number(event.args.id);
+      console.log(`✅ Policy created successfully with ID: ${policyId}`);
+
+      // 4️⃣ Send policy to backend
+      const res = await fetch("/api/policies", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          policyId,
+          userAddress: signer,
+          flightRef: "BA29720022026",
+        }),
+      });
+
+      if (!res.ok) {
+        const errorText = await res.text();
+        throw new Error(`Failed to register policy in backend: ${res.status} - ${errorText}`);
+      }
+
+      console.log("✅ Policy registered in backend successfully");
+
+      return policyId; // return ID in case caller needs it
+    } catch (err) {
+      console.error("❌ Error submitting claim:", err);
+      alert("Failed to create policy. Check console for details.");
+      throw err; // re-throw in case caller wants to handle
     }
-    if (!form.to || form.to.trim() === '') {
-      errors.to = 'This field is required';
-    }
-    if (!ticketRef || ticketRef.trim() === '') {
-      errors.ticketRef = 'This field is required';
-    }
-    
-    if (Object.keys(errors).length > 0) {
-      setFieldErrors(errors);
-      return;
-    }
-    
-    // Clear any errors
-    setFieldErrors({});
-    
-    const claimDate = form.date || new Date().toISOString().slice(0, 10);
-    const journey = `${form.from} → ${form.to}`;
-    const newClaim = {
-      id: String(Date.now()),
-      transport: 'Plane',
-      ticketRef: ticketRef,
-      journey,
-      date: claimDate,
-      delayMins: '—',
-      amount: '—',
-      status: 'submitted',
-    };
-    const updatedClaims = [newClaim, ...claims];
-    setClaims(updatedClaims);
-    sharedClaims = updatedClaims;
-    
-    // Reset form state after successful submission
-    setForm((prev) => ({
-      ...prev,
-      ticketRef: '', // Clear ticket code field
-    }));
-    setSubmittedTicketRef(''); // Clear stored ticketRef
-    setShowInfoBars(false); // Reset info bars state
-    setFieldErrors({}); // Clear all errors
-    
-    navigate('/claims');
-  };
+  }
 
   // Mock premium and contract data (will come from API later)
   const premiumAmount = 8.50;
@@ -732,7 +766,7 @@ function InsurePage() {
               <div className="workflow-block workflow-block--premium workflow-block--horizontal">
                 <div className="workflow-block-left">
                   <h3 className="workflow-block-title">Premium</h3>
-                  <p className="workflow-block-subtitle">Calculated from delay probability for this route (Flare AI / custom agent)</p>
+                  <p className="workflow-block-subtitle">Calculated from delay probability for this route.</p>
                 </div>
                 <div className="workflow-block-right">
                   <span className="workflow-block-value">£{premiumAmount.toFixed(2)}</span>

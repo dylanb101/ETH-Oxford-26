@@ -10,3 +10,4 @@ typechain-types/
 # Hardhat files
 .hardhat/
 
+package-lock.json
