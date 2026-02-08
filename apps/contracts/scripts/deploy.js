@@ -1,44 +1,52 @@
 import hre from "hardhat";
 import { Wallet, JsonRpcProvider } from "ethers";
 import dotenv from "dotenv";
-dotenv.config();
+dotenv.config({ path: ".env" });
 
 async function main() {
-  console.log("Deploying FlightDelayFactory...");
+  const RPC_URL = process.env.RPC_URL;
+  if (!RPC_URL) throw new Error("RPC_URL missing");
 
-  // 1️⃣ Connect to Flare testnet
-  const provider = new JsonRpcProvider("https://coston2-api.flare.network/ext/C/rpc");
+  const PRIVATE_KEY = process.env.PRIVATE_KEY;
+  if (!PRIVATE_KEY) throw new Error("PRIVATE_KEY missing");
 
-  // 2️⃣ Create deployer wallet
-  const deployer = new Wallet(process.env.PRIVATE_KEY.trim(), provider);
+  const C2FLR_ADDRESS = process.env.C2FLR_ADDRESS;
+  if (!C2FLR_ADDRESS || !C2FLR_ADDRESS.startsWith("0x"))
+    throw new Error("C2FLR_ADDRESS missing or invalid");
+
+  const provider = new JsonRpcProvider(RPC_URL);
+  const deployer = new Wallet(PRIVATE_KEY.trim(), provider);
   const deployerAddress = await deployer.getAddress();
   console.log("Deployer address:", deployerAddress);
 
-  // 3️⃣ Compile contracts
   await hre.run("compile");
 
-  // 4️⃣ Read artifact
-  const FactoryArtifact = await hre.artifacts.readArtifact("FlightDelayFactory");
-
-  // 5️⃣ Create ContractFactory with signer
-  const Factory = new hre.ethers.ContractFactory(
-    FactoryArtifact.abi,
-    FactoryArtifact.bytecode,
+  const PayoutEngineArtifact = await hre.artifacts.readArtifact("PayoutEngine");
+  const PayoutEngineFactory = new hre.ethers.ContractFactory(
+    PayoutEngineArtifact.abi,
+    PayoutEngineArtifact.bytecode,
     deployer
   );
 
-  // 6️⃣ Deploy with constructor argument (_oracle)
-  const factory = await Factory.deploy(deployerAddress); // <-- pass oracle here
-  await factory.waitForDeployment(); // ethers v6
+  const payoutEngine = await PayoutEngineFactory.deploy(C2FLR_ADDRESS);
+  await payoutEngine.waitForDeployment();
+  console.log("PayoutEngine deployed at:", payoutEngine.target);
 
-  console.log("FlightDelayFactory deployed at:", factory.target);
+  const InsuranceArtifact = await hre.artifacts.readArtifact("FlightInsuranceFDC");
+  const InsuranceFactory = new hre.ethers.ContractFactory(
+    InsuranceArtifact.abi,
+    InsuranceArtifact.bytecode,
+    deployer
+  );
+
+  const insurance = await InsuranceFactory.deploy(payoutEngine.target);
+  await insurance.waitForDeployment();
+  console.log("FlightInsuranceFDC deployed at:", insurance.target);
+
+  console.log("✅ Stage 0 deployment complete!");
 }
 
-
-main()
-  .then(() => process.exit(0))
-  .catch((error) => {
-    console.error(error);
-    process.exit(1);
-  });
-
+main().catch((err) => {
+  console.error(err);
+  process.exit(1);
+});

@@ -5,19 +5,29 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
 
 contract PayoutEngine {
-    IERC20 public fxrp;
+
+    IERC20 public token;
     bytes32 public merkleRoot;
+    address public admin;
 
     mapping(bytes32 => bool) public claimed;
 
     event Claimed(address indexed user, uint256 amount);
+    event MerkleRootUpdated(bytes32 root);
 
-    constructor(address _fxrp) {
-        fxrp = IERC20(_fxrp);
+    modifier onlyAdmin() {
+        require(msg.sender == admin, "Not admin");
+        _;
     }
 
-    function setMerkleRoot(bytes32 _root) external {
+    constructor(address _token) {
+        token = IERC20(_token);
+        admin = msg.sender;
+    }
+
+    function setMerkleRoot(bytes32 _root) external onlyAdmin {
         merkleRoot = _root;
+        emit MerkleRootUpdated(_root);
     }
 
     function verifyClaim(
@@ -25,10 +35,13 @@ contract PayoutEngine {
         uint256 policyId,
         uint256 amount,
         bytes32[] calldata proof
-    ) public returns (bytes32 leaf) {
+    ) internal returns (bytes32 leaf) {
         leaf = keccak256(abi.encodePacked(user, policyId, amount));
         require(!claimed[leaf], "Already claimed");
-        require(MerkleProof.verify(proof, merkleRoot, leaf), "Invalid proof");
+        require(
+            MerkleProof.verify(proof, merkleRoot, leaf),
+            "Invalid Merkle proof"
+        );
         claimed[leaf] = true;
     }
 
@@ -39,7 +52,10 @@ contract PayoutEngine {
         bytes32[] calldata proof
     ) external {
         verifyClaim(user, policyId, amount, proof);
-        fxrp.transfer(user, amount);
+        require(
+            token.transfer(user, amount),
+            "Token transfer failed"
+        );
         emit Claimed(user, amount);
     }
 }

@@ -304,7 +304,7 @@ function HomePage() {
                   <p className="hero-description">Instant delay insurance powered by blockchain — No claims, just code</p>
                 </div>
 
-                {/* Slogan text - right side */}
+                 {/* Slogan text - right side */}
                 <div className="hero-copy hero-copy--right">
                   <p className="hero-headline">Delay insurance on your journey.</p>
                 </div>
@@ -460,88 +460,77 @@ function InsurePage() {
   };
 
   // Final submit: create claim and navigate
-  const FACTORY_ADDRESS = process.env.FLARE_FACTORY_ADDRESS;
-
-// Example handleSubmitClaim function
-  const handleSubmitClaim = async (e) => {
+  const FACTORY_ADDRESS = process.env.REACT_APP_FLARE_FACTORY_ADDRESS;
+  // Example handleSubmitClaim function
+  const handleSubmitClaim = async (
+    e,
+    expirationTime,
+    minDelayMinutes,
+    payoutAmount,
+    premium,
+    flightRef,
+    account,           // user's wallet address
+    insuranceContract, // ethers.js contract instance
+  ) => {
     e.preventDefault();
-
-    if (!window.ethereum) {
-      alert("Please install MetaMask to proceed.");
-      return;
-    }
-
     try {
-      const provider = new BrowserProvider(window.ethereum);
-      const signer = provider.getSigner();
+      console.log("🚀 Submitting policy creation transaction...");
 
-      // Instantiate factory contract
-      const factory = new Contract(FACTORY_ADDRESS, FlightDelayFactoryABI, signer);
-
-      // Prepare policy data from form
-      const insuredAddress = await signer.getAddress();
-      const flightNumber = form.flightNumber;
-      const departureDate = Math.floor(new Date(form.date).getTime() / 1000); // convert to unix timestamp
-      const minDelayMinutes = 120; // Example threshold
-      const premium = parseEther("0.01"); // Example premium
-      const payout = parseEther("0.05");  // Example payout
-      const oracleAddress = process.env.REACT_APP_FLARE_ORACLE_ADDRESS; // Oracle address in .env
-
-      // Call factory to create new FlightDelayPolicy
-      const tx = await factory.createPolicy(
-        insuredAddress,
-        flightNumber,
-        departureDate,
+      // 1️⃣ Send transaction to smart contract
+      const tx = await insuranceContract.createPolicy(
+        expirationTime,
         minDelayMinutes,
-        premium,
-        payout,
-        { value: payout } // Fund the payout in the transaction
+        payoutAmount,
+        { value: premium }
       );
+      console.log("Transaction sent, waiting for confirmation...", tx.hash);
 
-      console.log("Transaction sent. Waiting for confirmation...", tx.hash);
-
+      // 2️⃣ Wait for transaction confirmation
       const receipt = await tx.wait();
       console.log("Transaction confirmed:", receipt.transactionHash);
 
-      // Get PolicyCreated event from receipt
-      const event = receipt.events.find((e) => e.event === "PolicyCreated");
-      if (!event) {
-        console.error("No PolicyCreated event found!");
-        return;
+      // 3️⃣ Parse logs to extract PolicyCreated event
+      const event = receipt.logs
+        .map((log) => {
+          try {
+            return insuranceContract.interface.parseLog(log);
+          } catch {
+            return null;
+          }
+        })
+        .find((e) => e && e.name === "PolicyCreated");
+
+      if (!event) throw new Error("PolicyCreated event not found in transaction logs");
+
+      const policyId = Number(event.args.id);
+      console.log(`✅ Policy created successfully with ID: ${policyId}`);
+
+      // 4️⃣ Send policy to backend
+      const res = await fetch("/api/policies", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          policyId,
+          userAddress: account,
+          flightRef,
+        }),
+      });
+
+      if (!res.ok) {
+        const errorText = await res.text();
+        throw new Error(`Failed to register policy in backend: ${res.status} - ${errorText}`);
       }
 
-      const newPolicyAddress = event.args.policy;
-      console.log("New policy deployed at:", newPolicyAddress);
+      console.log("✅ Policy registered in backend successfully");
 
-      // Optional: instantiate FlightDelayPolicy contract to interact with it
-      // import FlightDelayPolicyABI from "./abi/flightdelaypolicy.json";
-      // const policyContract = new Contract(newPolicyAddress, FlightDelayPolicyABI, signer);
-
-      alert(`Policy successfully created at address: ${newPolicyAddress}`);
-      
-      // Update claims UI
-      const newClaim = {
-        id: String(Date.now()),
-        transport: "Plane",
-        ticketRef: form.ticketRef,
-        journey: `${form.from} → ${form.to}`,
-        date: form.date,
-        delayMins: "—",
-        amount: "—",
-        status: "submitted",
-        policyAddress: newPolicyAddress
-      };
-
-      setClaims((prev) => [newClaim, ...prev]);
-      sharedClaims = [newClaim, ...sharedClaims];
-
-      // Clear form
-      setForm((prev) => ({ ...prev, ticketRef: "" }));
+      return policyId; // return ID in case caller needs it
     } catch (err) {
-      console.error("Error creating policy:", err);
-      alert("Failed to create policy. See console for details.");
+      console.error("❌ Error submitting claim:", err);
+      alert("Failed to create policy. Check console for details.");
+      throw err; // re-throw in case caller wants to handle
     }
-  };
+  }
+
   // Mock premium and contract data (will come from API later)
   const premiumAmount = 8.50;
   const contractConditions = `Payout if delay ≥ ${DELAY_THRESHOLD_MINUTES} minutes. Verified by Flare Data Connector (FDC). Contract created before travel — no contracts after the event date.`;
