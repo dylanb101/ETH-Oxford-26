@@ -102,6 +102,14 @@ app.get('/api/network', async (req, res) => {
   }
 });
 
+app.post('/api/flight/info', async (req, res) => {
+  try {
+    const { flightNumber, flightDate } = req.body;
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Get contract info
 app.get('/api/contract/info', async (req, res) => {
   try {

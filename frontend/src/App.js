@@ -1,7 +1,9 @@
 import React, { useState, useMemo } from 'react';
+import { BrowserProvider, Contract, parseEther } from "ethers";
 import { BrowserRouter as Router, Routes, Route, Link, useLocation, useNavigate } from 'react-router-dom';
 import { fetchFlightData, parseFlightData } from './services/aviationStackService';
 import './App.css';
+import FlightDelayFactoryABI from "./abis/FlightDelayFactory.json";
 
 const DELAY_THRESHOLD_MINUTES = 120; // Contract condition: payout if delay >= 2hrs
 
@@ -458,60 +460,88 @@ function InsurePage() {
   };
 
   // Final submit: create claim and navigate
-  const handleSubmitClaim = (e) => {
+  const FACTORY_ADDRESS = process.env.FLARE_FACTORY_ADDRESS;
+
+// Example handleSubmitClaim function
+  const handleSubmitClaim = async (e) => {
     e.preventDefault();
-    
-    // Use submittedTicketRef (stored from first submission) or current form.ticketRef as fallback
-    const ticketRef = submittedTicketRef || form.ticketRef;
-    
-    // Validate required fields for final submission
-    const errors = {};
-    if (!form.from || form.from.trim() === '') {
-      errors.from = 'This field is required';
-    }
-    if (!form.to || form.to.trim() === '') {
-      errors.to = 'This field is required';
-    }
-    if (!ticketRef || ticketRef.trim() === '') {
-      errors.ticketRef = 'This field is required';
-    }
-    
-    if (Object.keys(errors).length > 0) {
-      setFieldErrors(errors);
+
+    if (!window.ethereum) {
+      alert("Please install MetaMask to proceed.");
       return;
     }
-    
-    // Clear any errors
-    setFieldErrors({});
-    
-    const claimDate = form.date || new Date().toISOString().slice(0, 10);
-    const journey = `${form.from} → ${form.to}`;
-    const newClaim = {
-      id: String(Date.now()),
-      transport: 'Plane',
-      ticketRef: ticketRef,
-      journey,
-      date: claimDate,
-      delayMins: '—',
-      amount: '—',
-      status: 'submitted',
-    };
-    const updatedClaims = [newClaim, ...claims];
-    setClaims(updatedClaims);
-    sharedClaims = updatedClaims;
-    
-    // Reset form state after successful submission
-    setForm((prev) => ({
-      ...prev,
-      ticketRef: '', // Clear ticket code field
-    }));
-    setSubmittedTicketRef(''); // Clear stored ticketRef
-    setShowInfoBars(false); // Reset info bars state
-    setFieldErrors({}); // Clear all errors
-    
-    navigate('/claims');
-  };
 
+    try {
+      const provider = new BrowserProvider(window.ethereum);
+      const signer = provider.getSigner();
+
+      // Instantiate factory contract
+      const factory = new Contract(FACTORY_ADDRESS, FlightDelayFactoryABI, signer);
+
+      // Prepare policy data from form
+      const insuredAddress = await signer.getAddress();
+      const flightNumber = form.flightNumber;
+      const departureDate = Math.floor(new Date(form.date).getTime() / 1000); // convert to unix timestamp
+      const minDelayMinutes = 120; // Example threshold
+      const premium = parseEther("0.01"); // Example premium
+      const payout = parseEther("0.05");  // Example payout
+      const oracleAddress = process.env.REACT_APP_FLARE_ORACLE_ADDRESS; // Oracle address in .env
+
+      // Call factory to create new FlightDelayPolicy
+      const tx = await factory.createPolicy(
+        insuredAddress,
+        flightNumber,
+        departureDate,
+        minDelayMinutes,
+        premium,
+        payout,
+        { value: payout } // Fund the payout in the transaction
+      );
+
+      console.log("Transaction sent. Waiting for confirmation...", tx.hash);
+
+      const receipt = await tx.wait();
+      console.log("Transaction confirmed:", receipt.transactionHash);
+
+      // Get PolicyCreated event from receipt
+      const event = receipt.events.find((e) => e.event === "PolicyCreated");
+      if (!event) {
+        console.error("No PolicyCreated event found!");
+        return;
+      }
+
+      const newPolicyAddress = event.args.policy;
+      console.log("New policy deployed at:", newPolicyAddress);
+
+      // Optional: instantiate FlightDelayPolicy contract to interact with it
+      // import FlightDelayPolicyABI from "./abi/flightdelaypolicy.json";
+      // const policyContract = new Contract(newPolicyAddress, FlightDelayPolicyABI, signer);
+
+      alert(`Policy successfully created at address: ${newPolicyAddress}`);
+      
+      // Update claims UI
+      const newClaim = {
+        id: String(Date.now()),
+        transport: "Plane",
+        ticketRef: form.ticketRef,
+        journey: `${form.from} → ${form.to}`,
+        date: form.date,
+        delayMins: "—",
+        amount: "—",
+        status: "submitted",
+        policyAddress: newPolicyAddress
+      };
+
+      setClaims((prev) => [newClaim, ...prev]);
+      sharedClaims = [newClaim, ...sharedClaims];
+
+      // Clear form
+      setForm((prev) => ({ ...prev, ticketRef: "" }));
+    } catch (err) {
+      console.error("Error creating policy:", err);
+      alert("Failed to create policy. See console for details.");
+    }
+  };
   // Mock premium and contract data (will come from API later)
   const premiumAmount = 8.50;
   const contractConditions = `Payout if delay ≥ ${DELAY_THRESHOLD_MINUTES} minutes. Verified by Flare Data Connector (FDC). Contract created before travel — no contracts after the event date.`;
@@ -732,7 +762,7 @@ function InsurePage() {
               <div className="workflow-block workflow-block--premium workflow-block--horizontal">
                 <div className="workflow-block-left">
                   <h3 className="workflow-block-title">Premium</h3>
-                  <p className="workflow-block-subtitle">Calculated from delay probability for this route (Flare AI / custom agent)</p>
+                  <p className="workflow-block-subtitle">Calculated from delay probability for this route.</p>
                 </div>
                 <div className="workflow-block-right">
                   <span className="workflow-block-value">£{premiumAmount.toFixed(2)}</span>
