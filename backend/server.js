@@ -4,6 +4,20 @@ const cors = require('cors');
 const { ethers } = require('ethers');
 const axios = require('axios');
 
+// Load contract ABI
+let FlightInsuranceABI;
+try {
+  FlightInsuranceABI = require('./abis/FlightInsuranceFDC.json');
+} catch {
+  // Fallback to artifacts if abis folder doesn't exist
+  try {
+    FlightInsuranceABI = require('../apps/contracts/artifacts/contracts/FlightInsurance.sol/FlightInsuranceFDC.json');
+  } catch (error) {
+    console.warn('Could not load FlightInsurance ABI:', error.message);
+    FlightInsuranceABI = null;
+  }
+}
+
 const app = express();
 const PORT = process.env.PORT || 5000;
 
@@ -36,9 +50,9 @@ function initializeBlockchain() {
     }
 
     // Load contract ABI if address is provided
-    if (FLIGHT_INSURANCE_ADDRESS) {
+    if (FLIGHT_INSURANCE_ADDRESS && FlightInsuranceABI) {
       try {
-        const contractABI = require('./artifacts/contracts/FlightInsurance.sol/FlightInsuranceFDC.json').abi;
+        const contractABI = FlightInsuranceABI.abi || FlightInsuranceABI;
         if (signer) {
           flightInsuranceContract = new ethers.Contract(FLIGHT_INSURANCE_ADDRESS, contractABI, signer);
         } else {
@@ -236,6 +250,7 @@ app.post('/api/contract/resolve-policy', async (req, res) => {
   }
 });
 
+
 // Get account balance
 app.get('/api/account/balance/:address', async (req, res) => {
   try {
@@ -265,6 +280,94 @@ app.get('/api/signer/address', (req, res) => {
     return res.status(503).json({ error: 'Signer not configured' });
   }
   res.json({ address: signer.address });
+});
+
+// ============================================
+// Insurance Quote Generation
+// ============================================
+/**
+ * POST /api/quote
+ * 
+ * Generates an insurance quote based on flight data
+ * This is step 1 of the workflow - user sends flight data, gets quote
+ * 
+ * Request body:
+ * {
+ *   "flightNumber": "BA297",
+ *   "flightDate": "2024-12-25",
+ *   "minDelayMinutes": 30,  // Optional, defaults to 30
+ *   "payoutAmount": "100"    // Optional, defaults to calculated amount
+ * }
+ * 
+ * Response:
+ * {
+ *   "success": true,
+ *   "quote": {
+ *     "flightNumber": "BA297",
+ *     "flightDate": "2024-12-25",
+ *     "premium": "8.50",  // In C2FLR
+ *     "payout": "100.00",  // In C2FLR
+ *     "minDelayMinutes": 30,
+ *     "expirationTime": 1735689600,  // Unix timestamp (flight date + buffer)
+ *     "quoteId": "quote_1234567890"  // Unique quote ID
+ *   }
+ * }
+ */
+app.post('/api/quote', async (req, res) => {
+  try {
+    const { flightNumber, flightDate, minDelayMinutes = 30, payoutAmount } = req.body;
+
+    // Validate required fields
+    if (!flightNumber || !flightDate) {
+      return res.status(400).json({ 
+        error: 'Missing required fields: flightNumber and flightDate' 
+      });
+    }
+
+    // Validate flight number format
+    const cleanFlightNumber = flightNumber.toUpperCase().trim();
+    const match = cleanFlightNumber.match(/^([A-Z]{2})(\d+)$/);
+    if (!match) {
+      return res.status(400).json({ 
+        error: 'Invalid flight number format. Use format like BA297 or AA100' 
+      });
+    }
+
+    // Validate date
+    const flightDateObj = new Date(flightDate);
+    if (isNaN(flightDateObj.getTime())) {
+      return res.status(400).json({ error: 'Invalid flight date format' });
+    }
+
+    // Calculate expiration time (flight date + 24 hours buffer for claims)
+    const expirationTime = Math.floor(flightDateObj.getTime() / 1000) + (24 * 60 * 60);
+
+    // Calculate premium based on route/risk (simplified - in production use ML/risk model)
+    // For now, using a simple formula: premium = payout * 0.1 (10% of payout)
+    const payout = payoutAmount ? parseFloat(payoutAmount) : 100.0; // Default payout
+    const premium = payout * 0.085; // 8.5% premium (adjust based on risk model)
+
+    // Generate unique quote ID
+    const quoteId = `quote_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+    res.json({
+      success: true,
+      quote: {
+        flightNumber: cleanFlightNumber,
+        flightDate,
+        premium: premium.toFixed(2),
+        payout: payout.toFixed(2),
+        minDelayMinutes: parseInt(minDelayMinutes),
+        expirationTime,
+        expirationTimeReadable: new Date(expirationTime * 1000).toISOString(),
+        quoteId
+      },
+      message: 'Quote generated successfully. User can accept to create contract.'
+    });
+  } catch (error) {
+    console.error('Error generating quote:', error);
+    res.status(500).json({ error: error.message || 'Internal server error' });
+  }
 });
 
 // ============================================
@@ -443,13 +546,16 @@ function getMockFlightData(cleanFlightNumber, formattedDate, match) {
  * Creates a contract and prepares transaction data for MetaMask
  * Accepts amounts in C2FLR (not Wei) and returns transaction data for frontend
  * 
- * Request body:
+ * This is step 2 of the workflow - user accepts quote, creates contract via MetaMask
+ * 
+ * Request body (can use quote data directly):
  * {
  *   "premium": "10.5",  // Premium amount in C2FLR
  *   "expirationTime": 1735689600,  // Unix timestamp
  *   "minDelayMinutes": 30,  // Minimum delay in minutes to trigger payout
  *   "payoutAmount": "15.75",  // Payout amount in C2FLR
- *   "merkleProof": []  // Optional merkle proof array
+ *   "merkleProof": [],  // Optional merkle proof array
+ *   "quoteId": "quote_1234567890"  // Optional: quote ID for tracking
  * }
  * 
  * Response:
@@ -569,6 +675,388 @@ app.post('/api/contract/create', async (req, res) => {
   } catch (error) {
     console.error('Error creating contract:', error);
     res.status(500).json({ error: error.message || 'Internal server error' });
+  }
+});
+
+// ============================================
+// Flight Data Fetch Function
+// ============================================
+/**
+ * Fetches flight delay data from AviationStack API
+ * This data is NOT trusted on-chain — it's only for UX + proof building
+ * 
+ * @param {number} policyId - Policy ID (for logging/tracking)
+ * @param {string} flightNumber - Flight IATA code (e.g., "BA297")
+ * @param {string} flightDate - Optional flight date in YYYY-MM-DD format
+ * @returns {Promise<{delayMinutes: number}>} Flight delay data
+ */
+async function getFlightDelay(policyId, flightNumber, flightDate = null) {
+  try {
+    // Validate flight number format
+    const cleanFlightNumber = flightNumber.toUpperCase().trim();
+    const match = cleanFlightNumber.match(/^([A-Z]{2})(\d+)$/);
+    if (!match) {
+      throw new Error('Invalid flight number format. Use format like BA297 or AA100');
+    }
+
+    // Format date as YYYY-MM-DD for API
+    let formattedDate = null;
+    if (flightDate) {
+      formattedDate = new Date(flightDate).toISOString().split('T')[0];
+    }
+
+    // Call AviationStack API
+    const API_URL = 'http://api.aviationstack.com/v1/flights';
+    const params = {
+      access_key: AVIATIONSTACK_API_KEY,
+      flight_num: cleanFlightNumber,
+    };
+
+    if (formattedDate) {
+      params.flight_date = formattedDate;
+    }
+
+    let flightData;
+    try {
+      const response = await axios.get(API_URL, { params });
+
+      if (response.data && response.data.data && response.data.data.length > 0) {
+        flightData = response.data.data[0]; // Use first flight
+      } else {
+        throw new Error('Flight not found');
+      }
+    } catch (apiError) {
+      console.error('AviationStack API error:', apiError.message);
+
+      // If API key is missing or API fails, return mock data for development
+      if (!AVIATIONSTACK_API_KEY || apiError.response?.status === 401 || apiError.response?.status === 403) {
+        console.warn('Using mock flight delay data (API key not configured)');
+        // Return mock delay for development
+        return {
+          delayMinutes: 135 // Mock delay in minutes
+        };
+      }
+
+      throw apiError;
+    }
+
+    // Extract delay from flight data
+    const dep = flightData.departure || {};
+    const delayMinutes = dep.delay ? Math.floor(dep.delay / 60) : 0; // Convert seconds to minutes
+
+    return {
+      delayMinutes,
+      flightNumber: cleanFlightNumber,
+      flightDate: formattedDate,
+      scheduled: dep.scheduled,
+      actual: dep.actual,
+      delaySeconds: dep.delay || 0
+    };
+  } catch (error) {
+    console.error(`Error fetching flight delay for policy ${policyId}:`, error);
+    throw error;
+  }
+}
+
+// ============================================
+// Flare Data Connector (FDC) Web2Json Verification
+// ============================================
+/**
+ * Requests FDC Web2Json proof from Flare Data Connector
+ * This is the important Flare-specific part for on-chain verification
+ * 
+ * The returned object maps directly to:
+ * resolvePolicy(uint256 policyId, IWeb2Json.Proof proof)
+ * 
+ * @param {Object} options - FDC request options
+ * @param {string} options.url - URL to fetch JSON data from
+ * @param {string} options.jsonPath - JSONPath to extract the value (e.g., "$.delayMinutes")
+ * @param {string} options.method - HTTP method (default: "GET")
+ * @returns {Promise<Object>} FDC proof object compatible with IWeb2Json.Proof
+ */
+async function requestFdcWeb2JsonProof({ url, jsonPath, method = "GET" }) {
+  const FLARE_FDC_URL = process.env.FLARE_FDC_URL || 'https://coston2-api.flare.network/ext/bc/C/rpc';
+  
+  const response = await axios.post(
+    `${FLARE_FDC_URL}/web2json/verify`,
+    {
+      url,
+      method,
+      responseBodyExtraction: {
+        jsonPath
+      }
+    }
+  );
+
+  return response.data;
+}
+
+/**
+ * POST /api/fdc/web2json/proof
+ * 
+ * Generates an FDC Web2Json proof for flight delay data
+ * This proof can be used with resolvePolicy on-chain
+ * 
+ * Request body:
+ * {
+ *   "url": "https://api.flightprovider.com/flight/LH404",
+ *   "jsonPath": "$.delayMinutes",
+ *   "method": "GET" (optional)
+ * }
+ */
+app.post('/api/fdc/web2json/proof', async (req, res) => {
+  try {
+    const { url, jsonPath, method = "GET" } = req.body;
+
+    if (!url || !jsonPath) {
+      return res.status(400).json({ 
+        error: 'Missing required fields: url and jsonPath' 
+      });
+    }
+
+    const proof = await requestFdcWeb2JsonProof({ url, jsonPath, method });
+
+    res.json({
+      success: true,
+      proof,
+      message: 'Use this proof with resolvePolicy contract function'
+    });
+  } catch (error) {
+    console.error('FDC proof generation error:', error);
+    res.status(500).json({ 
+      error: 'Failed to generate FDC proof', 
+      details: error.message 
+    });
+  }
+});
+
+// ============================================
+// Policy Claim/Verification Endpoint
+// ============================================
+/**
+ * POST /api/policies/:policyId/claim
+ * 
+ * This is the final step - user clicks button, backend:
+ * 1. Gets flight delay data
+ * 2. Gets FDC proof
+ * 3. Calls resolvePolicy on-chain (if signer available) OR returns transaction data
+ * 4. Returns result
+ * 
+ * Request body:
+ * {
+ *   "flightNumber": "BA297",
+ *   "flightDate": "2024-12-25"
+ * }
+ * 
+ * Response (if backend has signer):
+ * {
+ *   "success": true,
+ *   "policyId": 0,
+ *   "fulfilled": true,
+ *   "transactionHash": "0x...",
+ *   "message": "Policy fulfilled and payout sent"
+ * }
+ * 
+ * Response (if no signer - returns transaction data for frontend):
+ * {
+ *   "success": true,
+ *   "policyId": 0,
+ *   "fulfilled": true,
+ *   "transaction": { ... },
+ *   "message": "Use transaction data to call resolvePolicy via MetaMask"
+ * }
+ */
+app.post('/api/policies/:policyId/claim', async (req, res) => {
+  try {
+    if (!flightInsuranceContract) {
+      return res.status(503).json({ error: 'FlightInsurance contract not initialized' });
+    }
+
+    const policyId = Number(req.params.policyId);
+    const { flightNumber, flightDate } = req.body;
+
+    if (!flightNumber || !flightDate) {
+      return res.status(400).json({ 
+        error: 'Missing required fields: flightNumber and flightDate' 
+      });
+    }
+
+    // 1. Read policy from chain
+    const policy = await flightInsuranceContract.policies(policyId);
+
+    // Check if policy is active
+    if (policy.status !== 0n) {
+      return res.json({
+        success: false,
+        fulfilled: false,
+        reason: policy.status === 1n ? "Policy already settled" : "Policy expired",
+        status: Number(policy.status)
+      });
+    }
+
+    // 2. Check expiration
+    const now = Math.floor(Date.now() / 1000);
+    if (now > Number(policy.expirationTime)) {
+      return res.json({
+        success: false,
+        fulfilled: false,
+        reason: "Policy expired",
+        expirationTime: Number(policy.expirationTime),
+        currentTime: now
+      });
+    }
+
+    // 3. Fetch flight delay data
+    let flightDelayData;
+    try {
+      flightDelayData = await getFlightDelay(policyId, flightNumber, flightDate);
+    } catch (error) {
+      return res.status(500).json({ 
+        error: 'Failed to fetch flight delay data', 
+        details: error.message 
+      });
+    }
+
+    // 4. Check if delay meets minimum threshold
+    const minDelayMinutes = Number(policy.minDelayMinutes);
+    if (flightDelayData.delayMinutes < minDelayMinutes) {
+      return res.json({
+        success: true,
+        fulfilled: false,
+        reason: "Flight delay not sufficient",
+        delayMinutes: flightDelayData.delayMinutes,
+        minDelayMinutes,
+        message: `Flight delayed by ${flightDelayData.delayMinutes} minutes, but minimum is ${minDelayMinutes} minutes`
+      });
+    }
+
+    // 5. Generate FDC proof
+    // The FDC proof needs to encode the delay data as: VerifiedDelay { delayMinutes: uint256 }
+    // The ABI signature for encoding: "VerifiedDelay(uint256)"
+    
+    let fdcProof;
+    try {
+      // Construct the API URL that FDC will verify
+      // Note: In production, you may need to use a public API endpoint without the API key
+      // or set up FDC to handle authenticated requests
+      const fdcApiUrl = `https://api.aviationstack.com/v1/flights?flight_num=${flightNumber}&flight_date=${flightDate}&access_key=${AVIATIONSTACK_API_KEY}`;
+      
+      // The JSONPath should extract the delay value (in seconds from API)
+      // FDC will then encode it according to the ABI signature
+      // ABI signature for VerifiedDelay struct: "VerifiedDelay(uint256)"
+      const delaySeconds = flightDelayData.delaySeconds || (flightDelayData.delayMinutes * 60);
+      
+      // Request FDC proof
+      // Note: The actual FDC service will:
+      // 1. Fetch the URL
+      // 2. Extract the value using jsonPath
+      // 3. Encode it according to the ABI signature
+      // 4. Return the proof structure
+      fdcProof = await requestFdcWeb2JsonProof({
+        url: fdcApiUrl,
+        jsonPath: "$.data[0].departure.delay", // Extract delay in seconds
+        method: "GET"
+      });
+      
+      // Note: The FDC proof's responseBody.abiEncodedData should contain:
+      // abi.encode(VerifiedDelay(uint256), delayMinutes)
+      // where delayMinutes is converted from seconds to minutes
+      // This encoding should be done by the FDC service based on the ABI signature
+      
+    } catch (fdcError) {
+      console.error('FDC proof generation error:', fdcError);
+      // If FDC fails, we can still return eligibility but can't fulfill on-chain
+      return res.json({
+        success: false,
+        fulfilled: false,
+        reason: "Failed to generate FDC proof",
+        delayMinutes: flightDelayData.delayMinutes,
+        minDelayMinutes,
+        message: "Flight is eligible but FDC proof generation failed. Please try again.",
+        details: fdcError.message,
+        note: "FDC proof generation requires proper Flare FDC setup. Check FLARE_FDC_URL environment variable."
+      });
+    }
+
+    // 6. Call resolvePolicy on-chain
+    if (signer) {
+      // Backend has signer - can execute transaction directly
+      try {
+        const tx = await flightInsuranceContract.resolvePolicy(
+          BigInt(policyId),
+          fdcProof
+        );
+        
+        const receipt = await tx.wait();
+        
+        res.json({
+          success: true,
+          fulfilled: true,
+          policyId,
+          delayMinutes: flightDelayData.delayMinutes,
+          minDelayMinutes,
+          transactionHash: receipt.hash,
+          payout: policy.payout.toString(),
+          message: "Policy fulfilled and payout sent successfully"
+        });
+      } catch (txError) {
+        console.error('Transaction error:', txError);
+        return res.status(500).json({
+          error: 'Failed to execute resolvePolicy transaction',
+          details: txError.message,
+          delayMinutes: flightDelayData.delayMinutes,
+          minDelayMinutes
+        });
+      }
+    } else {
+      // No signer - return transaction data for frontend to execute
+      try {
+        const gasEstimate = await flightInsuranceContract.resolvePolicy.estimateGas(
+          BigInt(policyId),
+          fdcProof
+        );
+
+        const feeData = await provider.getFeeData();
+        const network = await provider.getNetwork();
+
+        const transactionData = {
+          to: FLIGHT_INSURANCE_ADDRESS,
+          data: flightInsuranceContract.interface.encodeFunctionData('resolvePolicy', [
+            policyId.toString(),
+            fdcProof
+          ]),
+          gasLimit: gasEstimate.toString(),
+          gasPrice: feeData.gasPrice?.toString() || '0',
+          chainId: Number(network.chainId),
+        };
+
+        res.json({
+          success: true,
+          fulfilled: true,
+          policyId,
+          delayMinutes: flightDelayData.delayMinutes,
+          minDelayMinutes,
+          transaction: transactionData,
+          proof: fdcProof,
+          message: "Flight is eligible. Use transaction data to call resolvePolicy via MetaMask",
+          instructions: "Send this transaction from the policy holder's wallet to fulfill the contract"
+        });
+      } catch (estimateError) {
+        console.error('Gas estimation error:', estimateError);
+        return res.status(500).json({
+          error: 'Failed to estimate gas for resolvePolicy',
+          details: estimateError.message,
+          delayMinutes: flightDelayData.delayMinutes,
+          minDelayMinutes
+        });
+      }
+    }
+  } catch (error) {
+    console.error('Claim processing error:', error);
+    res.status(500).json({ 
+      error: 'Failed to process claim', 
+      details: error.message 
+    });
   }
 });
 
