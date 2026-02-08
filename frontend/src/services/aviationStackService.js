@@ -126,7 +126,7 @@ export function parseFlightData(apiFlights) {
  * @param {Array} match - Regex match result
  * @returns {Array} Mock flight data
  */
-function getMockFlightData(cleanFlightNumber, formattedDate, match) {
+export function getMockFlightData(cleanFlightNumber, formattedDate, match) {
   const [, airlineCode, flightNum] = match;
   const baseDate = formattedDate ? new Date(formattedDate) : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
   

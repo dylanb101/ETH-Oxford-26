@@ -1,9 +1,10 @@
 import React, { useState, useMemo } from 'react';
 import { BrowserProvider, Contract, parseEther } from "ethers";
 import { BrowserRouter as Router, Routes, Route, Link, useLocation, useNavigate } from 'react-router-dom';
-import { fetchFlightData, parseFlightData } from './services/aviationStackService';
+import { fetchFlightData, parseFlightData, getMockFlightData } from './services/aviationStackService';
 import './App.css';
 import FlightDelayFactoryABI from "./abis/FlightDelayFactory.json";
+import FlightInsuranceABI from "./abis/FlightInsuranceFDC.json";
 
 const DELAY_THRESHOLD_MINUTES = 120; // Contract condition: payout if delay >= 2hrs
 
@@ -459,30 +460,44 @@ function InsurePage() {
     setShowInfoBars(true);
   };
 
-  // Final submit: create claim and navigate
-  const FACTORY_ADDRESS = process.env.REACT_APP_FLARE_FACTORY_ADDRESS;
+  
   // Example handleSubmitClaim function
   const handleSubmitClaim = async (
-    e,
-    expirationTime,
-    minDelayMinutes,
-    payoutAmount,
-    premium,
-    flightRef,
-    account,           // user's wallet address
-    insuranceContract, // ethers.js contract instance
+    e,           // user's wallet address
   ) => {
     e.preventDefault();
     try {
       console.log("🚀 Submitting policy creation transaction...");
+
+      // 1️⃣ Get provider from MetaMask
+      const provider = new BrowserProvider(window.ethereum);
+
+      // 2️⃣ Request wallet access
+      await provider.send("eth_requestAccounts", []);
+
+      // 3️⃣ Get signer (THIS IS THE IMPORTANT PART)
+      const signer = await provider.getSigner();
+
+
+      const insuranceContract = new Contract(
+        process.env.REACT_APP_INSURANCE_ADDRESS,
+        FlightInsuranceABI.abi,
+        signer
+      );
+      const expirationTime = 2;
+      const minDelayMinutes = 1;
+      const payoutAmount = 1;
+
+
+      
 
       // 1️⃣ Send transaction to smart contract
       const tx = await insuranceContract.createPolicy(
         expirationTime,
         minDelayMinutes,
         payoutAmount,
-        { value: premium }
       );
+
       console.log("Transaction sent, waiting for confirmation...", tx.hash);
 
       // 2️⃣ Wait for transaction confirmation
@@ -511,8 +526,8 @@ function InsurePage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           policyId,
-          userAddress: account,
-          flightRef,
+          userAddress: signer,
+          flightRef: "BA29720022026",
         }),
       });
 

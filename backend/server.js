@@ -20,8 +20,7 @@ const __dirname = path.dirname(__filename);
 // Replace with the path found by `find` above
 const payoutEngineAbiPath = path.join(__dirname, "../apps/contracts/artifacts/contracts/PayoutEngine.sol/PayoutEngine.json");
 const insuranceAbiPath = path.join(__dirname, "../apps/contracts/artifacts/contracts/FlightInsurance.sol/FlightInsuranceFDC.json");
-console.log(payoutEngineAbiPath);
-console.log(insuranceAbiPath);
+
 const payoutEngineAbi = JSON.parse(fs.readFileSync(payoutEngineAbiPath, "utf8"));
 const insuranceAbi = JSON.parse(fs.readFileSync(insuranceAbiPath, "utf8"));
 
