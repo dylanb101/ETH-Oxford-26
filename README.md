@@ -10,16 +10,9 @@
 
 This project implements a complete decentralized insurance solution that combines blockchain smart contracts, oracles, AI-powered actuarial analysis, and external flight data APIs. Users can purchase flight insurance policies that automatically pay out when flights are delayed, without any manual claims processing.
 
-**Perfect for:**
-- 🎯 Developers exploring Web3 insurance
-- 🏆 Hackathon participants
-- 🚀 Web3 insurance innovators
-
 ## ✨ Features
 
 - 🔗 **Smart Contracts on Flare**: Automates policy creation, verification, and payouts on Coston2 testnet
-- 🤖 **AI Actuary**: Uses OpenAI to calculate premiums and delay thresholds
-- 🛫 **Real Flight Data Integration**: Fetches actual flight delay data via the AviationStack API
 - 🧠 **Decentralized Oracle Integration**: Powered by Flare Data Connector (FDC)
 - 🌐 **FastAPI Backend**: Handles signing, verification, and API integration
 - 💻 **React Frontend**: User-friendly UI for policy interaction (optional)
@@ -35,7 +28,7 @@ This project implements a complete decentralized insurance solution that combine
                             │                        │
                             ▼                        ▼
                      ┌──────────────┐      ┌─────────────────┐
-                     │ AviationStack│      │      FDC        │
+                     │ ANY TRANSPORT│      │      FDC        │
                      │     API      │      │  (Oracle)       │
                      └──────────────┘      └─────────────────┘
 ```
@@ -47,9 +40,6 @@ This project implements a complete decentralized insurance solution that combine
 - **Node.js** v18+
 - **Python** 3.8+
 - **Flare wallet** with Coston2 testnet access
-- **OpenAI API key** (optional, for AI actuary)
-- **AviationStack API key** (optional, for real flight data)
-
 ## 🚀 Quick Start
 
 ### 1️⃣ Backend Setup (FastAPI)
@@ -160,7 +150,7 @@ Use the smart contract interface or frontend to:
 1. Connect your wallet
 2. Enter flight details
 3. Pay the premium
-4. Receive policy NFT
+4. Receive policy NFT (future feature)
 
 ### Step 3: Claim Payout
 
@@ -192,22 +182,6 @@ flight-insurance-dapp/
 └── README.md               # This file
 ```
 
-## 📚 Documentation
-
-- **Backend API**: [Swagger UI](http://localhost:5000/docs)
-- **Flare Network**: [Official Docs](https://docs.flare.network)
-- **AviationStack**: [API Docs](https://aviationstack.com/documentation)
-- **FDC Address Guide**: [FDC_ADDRESS_GUIDE.md](./FDC_ADDRESS_GUIDE.md)
-
-## 🔍 Finding the FDC Address
-
-The project includes a detailed guide ([FDC_ADDRESS_GUIDE.md](./FDC_ADDRESS_GUIDE.md)) for locating or mocking the Flare Data Connector address:
-
-- ✅ Check Flare documentation & GitHub
-- ✅ Query using ethers.js
-- ✅ Use mock contracts for testing
-- ✅ Explore with Flare blockchain explorer
-
 ## 🛠️ Tech Stack
 
 **Blockchain:**
@@ -218,64 +192,23 @@ The project includes a detailed guide ([FDC_ADDRESS_GUIDE.md](./FDC_ADDRESS_GUID
 
 **Backend:**
 - FastAPI (Python Web Framework)
-- OpenAI API (AI Actuary)
-- AviationStack API (Flight Data)
+- TO WRITE DYLAN!!! TO WRITE WORKFLOW HERE ################################
 
 **Frontend:**
 - React.js
 - Web3.js / Ethers.js
 - Material-UI / Tailwind CSS
 
-## 🧑‍💻 Contributing
-
-Contributions are welcome! Here's how you can help:
-
-1. 🍴 Fork the repository
-2. 🌿 Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. 💾 Commit your changes (`git commit -m 'Add amazing feature'`)
-4. 📤 Push to the branch (`git push origin feature/amazing-feature`)
-5. 🎉 Open a Pull Request
-
-### Development Guidelines
-
-- Write clear, documented code
-- Add tests for new features
-- Update documentation as needed
-- Follow existing code style
-
-## 🐛 Issues & Support
-
-Found a bug or have a feature request?
-
-- 📝 [Open an issue](https://github.com/dylanb101/flight-insurance-dapp/issues)
-- 💬 Start a [discussion](https://github.com/dylanb101/flight-insurance-dapp/discussions)
-
-## 📫 Contact
-
-**Developer**: [@dylanb101](https://github.com/dylanb101)
-
-For questions or collaboration:
-- GitHub: [github.com/dylanb101](https://github.com/dylanb101)
-- Create an issue in this repository
-
 ## 🏆 Built For
 
 This project was created for **ETHOxford 2026**, showcasing the potential of decentralized insurance on the Flare Network.
 
-## 📄 License
+## 📚 Documentation
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+- **Backend API**: [Swagger UI](http://localhost:5000/docs)
+- **Flare Network**: [Official Docs](https://docs.flare.network)
+- **AviationStack**: [API Docs](https://aviationstack.com/documentation)
+- **FDC Address Guide**: [FDC_ADDRESS_GUIDE.md](./FDC_ADDRESS_GUIDE.md)
 
-## 🙏 Acknowledgments
 
-- **Flare Network** for providing the infrastructure
-- **ETHOxford 2026** for the inspiration
-- **OpenAI** for AI actuary capabilities
-- **AviationStack** for flight data API
-- The Web3 community for continuous support
 
----
-
-**⭐ If you find this project useful, please consider giving it a star!**
-
-Made with ❤️ for ETHOxford 2026
